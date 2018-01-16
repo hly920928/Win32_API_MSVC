@@ -5,14 +5,12 @@
 #include "Everything.h" 
 #include "myHeader_V2.h" 
 #include "test.h" 
-int main()
+int main(int argc, LPTSTR argv[])
 {
-	__try {
-		printf("In try\n");
-	}
-	__finally {
-		printf("In finally\n");
-	}
+	printf("%s\n", argv[0]);
+	printf("%d\n", argc);
+	for (int i = 1; i < argc; i++) 
+		printf("%s\n", argv[i]);
     return 0;
 }
 
