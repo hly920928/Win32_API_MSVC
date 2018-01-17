@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "myHeader_V2.h" 
-
 void ReportError(LPCWSTR userMessage, DWORD exitCode,
 	BOOL printErrorMessage) {
 	DWORD eMegLen, errNum = GetLastError();

@@ -21,3 +21,5 @@ Win32_MSVC/Win32_MSVC/targetver.h
 Win32_MSVC/Win32_MSVC/stdafx.h
 Win32_MSVC/Win32_MSVC/stdafx.cpp
 Win32_MSVC/Win32_MSVC/Debug/Win32_MSVC.pch
+Win32_MSVC/Debug/123.txt
+Win32_MSVC/Debug/test1.exe
