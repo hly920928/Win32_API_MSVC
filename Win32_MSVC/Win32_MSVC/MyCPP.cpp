@@ -260,3 +260,66 @@ void ReportException(LPCWSTR userMessage, DWORD exceptionCode) {
 		RaiseException((0x0FFFFFFF)&exceptionCode | 0xE0000000, 0, 0, NULL);
 	}
 }
+DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory) {
+	DWORD exCode;
+	DWORD_PTR readWrite, virtAddr;
+	exCode = pExP->ExceptionRecord->ExceptionCode;
+	printf("Filter. exCode: %x\n", exCode);
+	if ((0x20000000 & exCode) != 0) {
+		*eCategory = 10;
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+	switch(exCode) {
+	case EXCEPTION_ACCESS_VIOLATION:
+		readWrite =
+			(DWORD)(pExP->ExceptionRecord->ExceptionInformation[0]);
+		virtAddr =
+			(DWORD)(pExP->ExceptionRecord->ExceptionInformation[1]);
+		printf("Access Violation. Read/Write/Execute: %d. Address: %x\n",
+			readWrite, virtAddr);
+		*eCategory = 1;
+		return EXCEPTION_EXECUTE_HANDLER;
+	case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+		*eCategory = 1;
+		return EXCEPTION_EXECUTE_HANDLER;
+	case EXCEPTION_INT_DIVIDE_BY_ZERO:
+	case EXCEPTION_INT_OVERFLOW:
+		*eCategory = 2;
+		return EXCEPTION_EXECUTE_HANDLER;
+	case 0xc00002b5:
+	{   *eCategory = 3;
+	printf("Flt Exception - Divide by Zero.\n");
+	return EXCEPTION_EXECUTE_HANDLER; }
+	case EXCEPTION_FLT_OVERFLOW:
+		printf("Flt Exception - Large result.\n");
+		*eCategory = 3;
+		return EXCEPTION_EXECUTE_HANDLER;
+	case EXCEPTION_FLT_DENORMAL_OPERAND:
+	case EXCEPTION_FLT_INEXACT_RESULT:
+	case EXCEPTION_FLT_INVALID_OPERATION:
+	case EXCEPTION_FLT_STACK_CHECK:
+		printf("Flt Exception - Unknown result.\n");
+		*eCategory = 3;
+		return EXCEPTION_CONTINUE_EXECUTION;
+	case EXCEPTION_FLT_UNDERFLOW:
+		printf("Flt Exception - Small result.\n");
+		*eCategory = 3;
+		return EXCEPTION_CONTINUE_EXECUTION;
+	case EXCEPTION_DATATYPE_MISALIGNMENT:
+		*eCategory = 4;
+		return EXCEPTION_CONTINUE_SEARCH;
+	case STATUS_NONCONTINUABLE_EXCEPTION:
+		*eCategory = 5;
+		return EXCEPTION_EXECUTE_HANDLER;
+	case EXCEPTION_ILLEGAL_INSTRUCTION:
+	case EXCEPTION_PRIV_INSTRUCTION:
+		*eCategory = 6;
+		return EXCEPTION_EXECUTE_HANDLER;
+	case STATUS_NO_MEMORY:
+		*eCategory = 7;
+		return EXCEPTION_EXECUTE_HANDLER;
+	default:
+		*eCategory = 0;
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+}
