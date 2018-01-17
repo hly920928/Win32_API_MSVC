@@ -18,36 +18,39 @@ int main(int argc, LPCSTR argv[])
 		| EM_ZERODIVIDE | EM_DENORMAL | EM_INVALID);
 	_controlfp_s(&fpOldDummy, fpNew, MCW_EM);
 	while (!done) {
-		__try {
+	       try {
 			printf("Enter exception type:\n");
 			printf("1: Mem, 2: Int, 3: Flt 4: User 5: _leave 6: return\n");
 			scanf_s("%d", &i);
-			__try {
+		   try {
 				switch (i) {
 				case 1:
+					if (!pNull)throw 1;
 					ix = *pNull;
 					*pNull = 5;
 					break;
 				case 2:
+					if (!iy)throw 2;
 					ix = ix / iy;
 					break;
 				case 3:
-					printf("y=0\n");
+					if (y==0)throw 3;
 					x = x / y;
 					break;
 				case 4:
 					ReportException(_T("Raising user exception.\n"), 1);
+					throw 4; 
 					break;
 				case 5:
 					done = TRUE;
-					__leave;
 				case 6:
 					return 1;
 				default: done = TRUE;
 				}
 			}
-			__except (ErrorFilter(GetExceptionInformation(), &eCategory)) {
-				switch (eCategory) {
+			catch (int x) {
+				printf("Catch Exception\n");
+				switch (x) {
 				case 0:	_tprintf(_T("Unknown exception.\n"));
 					break;
 				case 1:	_tprintf(_T("Memory ref exception.\n"));
@@ -63,14 +66,13 @@ int main(int argc, LPCSTR argv[])
 					break;
 				}
 				_tprintf(_T("End of handler.\n"));
+				throw 0;
 			}
 		}
-		__finally {
-			BOOL AbTerm;
+		   catch (...) {
+			   printf("Exception happen\n");
+		   };
 			_controlfp_s(&fpOldDummy, fpOld, MCW_EM);
-			AbTerm = AbnormalTermination();
-			_tprintf(_T("Abnormal Termination?: %d\n"), AbTerm);
-		}
 		return 0;
 	}
 }
