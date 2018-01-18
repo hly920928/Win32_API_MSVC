@@ -5,6 +5,7 @@
 #define STRING_SIZE 200
 #define MAX_OPTION 6666
 extern "C"
+
 struct _RECORD {
 	DWORD			referenceCount;
 	SYSTEMTIME		recordCreationTime;
@@ -31,3 +32,4 @@ BOOL DisplayPair(LPTSTR valueName, DWORD valueType, LPBYTE value, DWORD valueLen
 BOOL DisplaySubKey(LPTSTR keyName, LPTSTR subKeyName, PFILETIME pLastWrite, LPBOOL flags);
 void ReportException(LPCWSTR userMessage, DWORD exceptionCode);
 DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory);
+BOOL WINAPI CtrlHandler(DWORD cntrlEvent);
