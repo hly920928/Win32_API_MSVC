@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "myHeader_V2.h" 
+
 void ReportError(LPCWSTR userMessage, DWORD exitCode,
 	BOOL printErrorMessage) {
 	DWORD eMegLen, errNum = GetLastError();
@@ -325,3 +326,20 @@ DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory) {
 }
 
 
+LPTNODE FillTree(HANDLE, HANDLE, HANDLE) {
+	return nullptr;
+}
+BOOL InsertTree(LPPTNODE, LPTNODE) {
+
+}
+BOOL Scan(LPTNODE pNode) {
+	if (pNode == NULL)
+		return TRUE;
+	Scan(pNode->Left);
+    printf("%s\n", pNode->pData);
+	Scan(pNode->Right);
+	return TRUE;
+}
+int KeyCompare(LPCSTR pKey1, LPCSTR pKey2) {
+	return strcmp(pKey1, pKey2);
+}
