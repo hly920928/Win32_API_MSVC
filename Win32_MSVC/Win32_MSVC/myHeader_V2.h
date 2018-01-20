@@ -9,7 +9,7 @@ extern "C"
 struct _TREENODE {
 	struct _TREENODE *Left, *Right;
 	CHAR key[KEY_SIZE];
-	LPTSTR pData;
+	char* pData;
 };
 #define TREENODE _TREENODE
 #define LPTNODE  _TREENODE*
@@ -24,7 +24,6 @@ static int nFile;
 LPTNODE FillTree(HANDLE, HANDLE, HANDLE);
 BOOL Scan(LPTNODE);
 int KeyCompare(LPCSTR, LPCSTR);
-
 BOOL InsertTree(LPPTNODE, LPTNODE);
 struct _RECORD {
 	DWORD			referenceCount;

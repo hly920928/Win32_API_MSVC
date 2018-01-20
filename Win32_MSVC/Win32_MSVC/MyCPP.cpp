@@ -326,11 +326,51 @@ DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory) {
 }
 
 
-LPTNODE FillTree(HANDLE, HANDLE, HANDLE) {
+LPTNODE FillTree(HANDLE hIn, HANDLE hNode, HANDLE hData) {
+	LPTNODE pRoot = NULL;
+	LPTNODE	pNode;
+	DWORD nRead, i;
+	BOOL atCR;
+	CHAR dataHold[MAX_DATA_LEN];
+	char* pString;
+	while (TRUE) {
+		pNode=(LPTNODE) HeapAlloc(hNode, HEAP_ZERO_MEMORY, NODE_SIZE);
+		pNode->pData = NULL;
+		(pNode->Left) = pNode->Right = NULL;
+		if (!ReadFile(hIn, pNode->key, TKEY_SIZE,
+			&nRead, NULL) || nRead != TKEY_SIZE)
+			return pRoot;
+		atCR = FALSE; 
+		for (i = 0; i < MAX_DATA_LEN; i++) {
+			ReadFile(hIn, &dataHold[i], TSIZE, &nRead, NULL);
+			if (atCR && dataHold[i] == '\n') break;
+			atCR = (dataHold[i] == '\r');
+		}
+		dataHold[i - 1] ='\0';
+
+		/* dataHold contains the data without the key.
+		Combine the key and the Data. */
+		pString = (char*)HeapAlloc(hData, HEAP_ZERO_MEMORY,
+			(SIZE_T)(KEY_SIZE + strlen(dataHold) + 1) * TSIZE);
+		memcpy(pString, pNode->key, TKEY_SIZE);
+		pString[KEY_SIZE] = '\0';
+		strcat(pString, dataHold);
+		pNode->pData = pString;
+		/* Insert the new node into the search tree. */
+		InsertTree(&pRoot, pNode);
+	}
 	return nullptr;
 }
-BOOL InsertTree(LPPTNODE, LPTNODE) {
-
+BOOL InsertTree(LPPTNODE ppRoot, LPTNODE pNode) {
+	if (*ppRoot == NULL) {
+		*ppRoot = pNode;
+		return TRUE;
+	}
+	if (KeyCompare(pNode->key, (*ppRoot)->key) < 0)
+		InsertTree(&((*ppRoot)->Left), pNode);
+	else
+		InsertTree(&((*ppRoot)->Right), pNode);
+	return TRUE;
 }
 BOOL Scan(LPTNODE pNode) {
 	if (pNode == NULL)
