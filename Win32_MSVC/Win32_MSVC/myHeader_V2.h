@@ -5,7 +5,27 @@
 #define STRING_SIZE 200
 #define MAX_OPTION 6666
 extern "C"
+#define KEY_SIZE 8
+struct _TREENODE {
+	struct _TREENODE *Left, *Right;
+	CHAR key[KEY_SIZE];
+	LPTSTR pData;
+};
+#define TREENODE _TREENODE
+#define LPTNODE  _TREENODE*
+#define LPPTNODE _TREENODE**
+#define NODE_SIZE sizeof (TREENODE)
+#define NODE_HEAP_ISIZE 0x8000
+#define DATA_HEAP_ISIZE 0x8000
+#define MAX_DATA_LEN 0x1000
+#define TKEY_SIZE KEY_SIZE * sizeof (CHAR)
+#define ERROR_STATUS_FILE 0xE0000001
 
+LPTNODE FillTree(HANDLE, HANDLE, HANDLE);
+BOOL Scan(LPTNODE);
+int KeyCompare(LPCTSTR, LPCTSTR),
+int iFile; 
+BOOL InsertTree(LPPTNODE, LPTNODE);
 struct _RECORD {
 	DWORD			referenceCount;
 	SYSTEMTIME		recordCreationTime;
