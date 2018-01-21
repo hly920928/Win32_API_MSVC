@@ -17,6 +17,7 @@ struct _TREENODE {
 #define NODE_SIZE sizeof (TREENODE)
 #define NODE_HEAP_ISIZE 0x8000
 #define DATA_HEAP_ISIZE 0x8000
+#define printf printf_s
 #define MAX_DATA_LEN 0x1000
 #define TKEY_SIZE KEY_SIZE * sizeof (CHAR)
 #define ERROR_STATUS_FILE 0xE0000001
@@ -51,4 +52,4 @@ BOOL DisplayPair(LPTSTR valueName, DWORD valueType, LPBYTE value, DWORD valueLen
 BOOL DisplaySubKey(LPTSTR keyName, LPTSTR subKeyName, PFILETIME pLastWrite, LPBOOL flags);
 void ReportException(LPCWSTR userMessage, DWORD exceptionCode);
 DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory);
-BOOL WINAPI CtrlHandler(DWORD cntrlEvent);
+BOOL cci_fileMapped(LPCSTR fIn, LPCSTR fOut, DWORD shift);

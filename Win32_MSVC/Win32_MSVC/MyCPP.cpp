@@ -325,6 +325,71 @@ DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory) {
 	}
 }
 
+BOOL cci_fileMapped(LPCSTR fIn, LPCSTR fOut, DWORD shift)
+{
+	BOOL complete = FALSE;
+	HANDLE hIn = INVALID_HANDLE_VALUE, hOut = INVALID_HANDLE_VALUE;
+	HANDLE hInMap = NULL, hOutMap = NULL;
+	LPSTR pIn = NULL;
+	LPSTR pInFile = NULL;
+	LPSTR pOut = NULL;
+	LPSTR pOutFile = NULL;
+	LARGE_INTEGER fileSize;
+	hIn = CreateFileA(fIn, GENERIC_READ, 0, NULL,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hIn == INVALID_HANDLE_VALUE)
+	{
+		printf("Open Infile Fail\n"); return FALSE;
+	}
+	if (!GetFileSizeEx(hIn, &fileSize)) {
+		printf("GetFileSize() Fail\n");
+		return FALSE;
+	}
+	hInMap = CreateFileMapping(hIn, NULL, PAGE_READONLY, 0, 0, NULL);
+	if (hInMap == NULL) {
+		printf("hInMap CreateMap Fail\n");return FALSE;
+	}
+	pInFile = (LPSTR)MapViewOfFile(hInMap, FILE_MAP_READ, 0, 0, 0);
+	if (pInFile == NULL) {
+		printf("pInFile Map Fail\n");
+		return FALSE;
+	}
+	hOut = CreateFileA(fOut, GENERIC_READ | GENERIC_WRITE,
+		0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hOut == INVALID_HANDLE_VALUE) {
+		printf("Open Outfile Fail\n"); return FALSE;
+	}
+	hOutMap = CreateFileMapping(hOut, NULL, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, NULL);
+	if (hOutMap == NULL) {
+		printf("hInMap CreateMap Fail\n");return FALSE;
+	}
+	pOutFile = (LPSTR)MapViewOfFile(hOutMap, FILE_MAP_WRITE, 0, 0, (SIZE_T)fileSize.QuadPart);
+	if (pOutFile == NULL) {
+		printf("pOutFile Map Fail\n"); return FALSE;
+	}
+	//process
+	CHAR cShift = (CHAR)shift;
+	pIn = pInFile;
+	pOut = pOutFile;
+
+	while (pIn < pInFile + fileSize.QuadPart) {
+		if (pIn == NULL || pOut == NULL) {
+			printf("Nullptr Fail\n"); return FALSE;
+		}
+		if (isalpha(*pIn))
+			*pOut = (*pIn + cShift);
+		else  *pOut = *pIn; 
+		pIn++; pOut++;
+	}
+	complete = TRUE;
+   //release all
+   /* Close all views and handles. */
+	UnmapViewOfFile(pOutFile); UnmapViewOfFile(pInFile);
+	CloseHandle(hOutMap); CloseHandle(hInMap);
+	CloseHandle(hIn); CloseHandle(hOut);
+	return complete;
+}
+
 
 LPTNODE FillTree(HANDLE hIn, HANDLE hNode, HANDLE hData) {
 	LPTNODE pRoot = NULL;
