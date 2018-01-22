@@ -382,8 +382,66 @@ BOOL cci_fileMapped(LPCSTR fIn, LPCSTR fOut, DWORD shift)
 		pIn++; pOut++;
 	}
 	complete = TRUE;
-   //release all
-   /* Close all views and handles. */
+   //Release And Close all
+	UnmapViewOfFile(pOutFile); UnmapViewOfFile(pInFile);
+	CloseHandle(hOutMap); CloseHandle(hInMap);
+	CloseHandle(hIn); CloseHandle(hOut);
+	return complete;
+}
+
+BOOL sortFileMapped(LPCSTR fIn, LPCSTR fOut)
+{
+	BOOL complete = FALSE;
+	HANDLE hIn = INVALID_HANDLE_VALUE, hOut = INVALID_HANDLE_VALUE;
+	HANDLE hInMap = NULL, hOutMap = NULL;
+	word* pIn = NULL;
+	word* pInFile = NULL;
+	word* pOut = NULL;
+	word* pOutFile = NULL;
+	LARGE_INTEGER fileSize;
+	hIn = CreateFileA(fIn, GENERIC_READ, 0, NULL,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hIn == INVALID_HANDLE_VALUE)
+	{
+		printf("Open Infile Fail\n"); return FALSE;
+	}
+	if (!GetFileSizeEx(hIn, &fileSize)) {
+		printf("GetFileSize() Fail\n");
+		return FALSE;
+	}
+	hInMap = CreateFileMapping(hIn, NULL, PAGE_READONLY, 0, 0, NULL);
+	if (hInMap == NULL) {
+		printf("hInMap CreateMap Fail\n"); return FALSE;
+	}
+	pInFile = (word*)MapViewOfFile(hInMap, FILE_MAP_READ, 0, 0, 0);
+	if (pInFile == NULL) {
+		printf("pInFile Map Fail\n");
+		return FALSE;
+	}
+	hOut = CreateFileA(fOut, GENERIC_READ | GENERIC_WRITE,
+		0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hOut == INVALID_HANDLE_VALUE) {
+		printf("Open Outfile Fail\n"); return FALSE;
+	}
+	hOutMap = CreateFileMapping(hOut, NULL, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, NULL);
+	if (hOutMap == NULL) {
+		printf("hInMap CreateMap Fail\n"); return FALSE;
+	}
+	pOutFile = (word*)MapViewOfFile(hOutMap, FILE_MAP_WRITE, 0, 0, (SIZE_T)fileSize.QuadPart);
+	if (pOutFile == NULL) {
+		printf("pOutFile Map Fail\n"); return FALSE;
+	}
+	pIn = pInFile;
+	pOut = pOutFile;
+	int num = 0;
+	while (!pIn->isNull()) {
+		*pOut = *pIn;
+		pIn++;
+		pOut++; 
+		num++;
+	}
+	std::sort(pOutFile, pOut);
+	//Release And Close all
 	UnmapViewOfFile(pOutFile); UnmapViewOfFile(pInFile);
 	CloseHandle(hOutMap); CloseHandle(hInMap);
 	CloseHandle(hIn); CloseHandle(hOut);

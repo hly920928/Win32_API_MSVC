@@ -13,9 +13,9 @@ int main(int argc, LPCSTR argv[])
 	LPTNODE pRoot;
 	BOOL noPrint;
 	CHAR errorMessage[256];
-	char inFile[666] = "data.txt";
-	char outFile[666] = "output.txt";
-	cci_fileMapped(argv[1], argv[2], 1);
+	//char inFile[666] = "data.txt";
+	//char outFile[666] = "output.txt";
+	sortFileMapped(argv[1], argv[2]);
 	return 0;
 }
 

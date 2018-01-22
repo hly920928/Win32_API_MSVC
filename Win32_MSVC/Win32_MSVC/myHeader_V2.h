@@ -1,6 +1,7 @@
 #pragma once
 #include "Everything.h"
 #include <stdarg.h>
+#include <algorithm>
 #define BUF_SIZE 0x200
 #define STRING_SIZE 200
 #define MAX_OPTION 6666
@@ -37,6 +38,24 @@ struct _HEADER { /* File header descriptor */
 	DWORD			numRecords;
 	DWORD			numNonEmptyRecords;
 };
+struct word { /* File header descriptor */
+	char s[9];
+	bool operator<(const word& b) {
+		for (int i = 0; i < 9; i++) {
+			if (s[i] < b.s[i])return true;
+			if (s[i] >b.s[i])return false;
+		}
+		return false;
+	}
+	void operator=(const word& b) {
+		std::copy(b.s, b.s+ 9, s);
+	}
+	bool isNull() {
+		for (int i = 0; i < 9; i++)
+			if (s[i] != '\0')return false;
+		return true;
+	}
+};
 void ReportError(LPCWSTR userMessage, DWORD exitCode,
 	BOOL printErrorMessage);
 void CatFile(HANDLE, HANDLE);
@@ -53,3 +72,4 @@ BOOL DisplaySubKey(LPTSTR keyName, LPTSTR subKeyName, PFILETIME pLastWrite, LPBO
 void ReportException(LPCWSTR userMessage, DWORD exceptionCode);
 DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory);
 BOOL cci_fileMapped(LPCSTR fIn, LPCSTR fOut, DWORD shift);
+BOOL sortFileMapped(LPCSTR fIn, LPCSTR fOut);
