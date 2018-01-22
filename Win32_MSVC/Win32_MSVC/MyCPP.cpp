@@ -448,6 +448,28 @@ BOOL sortFileMapped(LPCSTR fIn, LPCSTR fOut)
 	return complete;
 }
 
+bool isNull(const char * p) {
+	for (int i = 0; i < 8; i++) {
+		if (isalnum(p[i]))return false;
+	}
+	return true;
+}
+
+void CreateIndexFile(LARGE_INTEGER inputSize, basedIndexData* pIndexFile, LPSTR pInFile) {
+	char  *cur = pInFile;
+	basedIndexData* pIndex = pIndexFile;
+	int num = 0;
+	long long offset = 0;
+	while (!isNull(cur)) {
+		if (*cur >='0'&& *cur <= '9') {
+			std::copy(cur, cur + 8, pIndex->key);
+			pIndex->offset =cur- pInFile;
+			pIndex++; cur= cur+8;
+			num++;
+		}else cur++;
+	}
+	std::sort(pIndexFile, pIndexFile+ num);
+}
 
 LPTNODE FillTree(HANDLE hIn, HANDLE hNode, HANDLE hData) {
 	LPTNODE pRoot = NULL;

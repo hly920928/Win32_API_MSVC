@@ -71,5 +71,30 @@ BOOL DisplayPair(LPTSTR valueName, DWORD valueType, LPBYTE value, DWORD valueLen
 BOOL DisplaySubKey(LPTSTR keyName, LPTSTR subKeyName, PFILETIME pLastWrite, LPBOOL flags);
 void ReportException(LPCWSTR userMessage, DWORD exceptionCode);
 DWORD ErrorFilter(LPEXCEPTION_POINTERS pExP, LPDWORD eCategory);
+//About Memory File Mapping
 BOOL cci_fileMapped(LPCSTR fIn, LPCSTR fOut, DWORD shift);
 BOOL sortFileMapped(LPCSTR fIn, LPCSTR fOut);
+static void* pBase;
+struct basedIndexData {
+	char key[8];
+	long long offset;
+	bool operator<(const basedIndexData&b) {
+		for (int i = 0; i < 8; i++)
+		{
+			if (key[i] < b.key[i])return true;
+			if (key[i] > b.key[i])return false;
+		}
+		return false;
+	}
+	void printOut(char* ptr)const {
+		char *cur = ptr + offset;
+		while (isalnum(*cur)) {
+			printf("%c", *cur);
+			cur++;
+		}
+		printf("\n");
+	}
+};
+bool isNull(const char* p);
+void CreateIndexFile(LARGE_INTEGER inputSize, basedIndexData* pIndexFile, LPSTR pInFile);
+
