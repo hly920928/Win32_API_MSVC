@@ -22,6 +22,7 @@ int main(int argc, LPCSTR argv[])
 	pPrintOut1((char*)argv[0]);
 	pPrintOut2((char*)argv[0]);
 	printf("End\n");
+	FreeLibrary(hDll);
 	return 0;
 }
 
