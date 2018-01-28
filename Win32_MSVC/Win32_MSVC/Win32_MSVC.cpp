@@ -16,28 +16,28 @@ struct PROCFILE {
 int main(int argc, LPCSTR argv[])
 {	
 	HANDLE hTempFile;
-	SECURITY_ATTRIBUTES stdOutSA = 
+	SECURITY_ATTRIBUTES stdOutSA =
 	{ sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 	char commandLine[MAX_PATH + 100];
 	STARTUPINFOA startUpSearch, startUp;
 	PROCESS_INFORMATION processInfo;
 	DWORD exitCode, dwCreationFlags = 0;
-	int iProc=5;
+	int iProc = 5;
 	GetStartupInfoA(&startUpSearch);
 	GetStartupInfoA(&startUp);
 	std::vector<PROCFILE>procFile; procFile.resize(iProc - 1);
 	std::vector<HANDLE>hProc; hProc.resize(iProc - 1);
 	// in for
 	sprintf(commandLine, "printOut %s", "t2222");
-	printf("%s", commandLine);
+	//printf("%s", commandLine);
 	if (GetTempFileNameA(".", "gtm", 0, procFile[0].tempFile) == 0)
 	{
 		printf("Temp File Name fail"); return 0;
 	}
 	const char tfile[] = "myTempFile.txt";
-	hTempFile = 
+	hTempFile =
 		CreateFileA(tfile,
-			 GENERIC_READ |  GENERIC_WRITE,
+			GENERIC_READ | GENERIC_WRITE,
 			FILE_SHARE_READ | FILE_SHARE_WRITE, &stdOutSA,
 			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hTempFile == INVALID_HANDLE_VALUE) {
@@ -53,19 +53,19 @@ int main(int argc, LPCSTR argv[])
 	}
 	hProc[0] = processInfo.hProcess;
 	CloseHandle(hTempFile); CloseHandle(processInfo.hThread);
-	WaitForMultipleObjects(argc - 1,hProc.data(), TRUE, INFINITE);
+	WaitForMultipleObjects(argc - 1, hProc.data(), TRUE, INFINITE);
 
-	if (GetExitCodeProcess(hProc[0], &exitCode) && exitCode ==1) {
+	if (GetExitCodeProcess(hProc[0], &exitCode) && exitCode == 1) {
 		fstream fs;
 		fs.open("myTempFile.txt");
 		string t;
 		fs >> t;
 		cout << t << endl;
+		fs.close();
 	}
 	CloseHandle(hProc[0]);
-	/*if (!DeleteFileA(tfile)) {
-		printf("Delete File fail\0"); return 0;
-	}*/
+	if (!DeleteFileA(tfile)) {
+	printf("Delete File fail\0"); return 0;}
 	return 0;
 }
 
