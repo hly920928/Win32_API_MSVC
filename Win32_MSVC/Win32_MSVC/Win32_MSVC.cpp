@@ -13,59 +13,52 @@ using namespace std;
 struct PROCFILE {
 	CHAR tempFile[100];
 };
+union wtime {	
+	LONGLONG li;
+	FILETIME ft;
+};
 int main(int argc, LPCSTR argv[])
 {	
-	HANDLE hTempFile;
-	SECURITY_ATTRIBUTES stdOutSA =
-	{ sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-	char commandLine[MAX_PATH + 100];
-	STARTUPINFOA startUpSearch, startUp;
-	PROCESS_INFORMATION processInfo;
-	DWORD exitCode, dwCreationFlags = 0;
-	int iProc = 5;
-	GetStartupInfoA(&startUpSearch);
+	STARTUPINFOA startUp;
+	PROCESS_INFORMATION procInfo;
+	wtime createTime, exitTime, elapsedTime;
+	FILETIME kernelTime, userTime;
+	SYSTEMTIME elTiSys, keTiSys, usTiSys;
+	LPSTR pargv = GetCommandLineA();
+	//skip first argv
+	while (*pargv!= ' ') {
+		pargv++;
+	}
+	while (*pargv == ' ') {
+		pargv++;
+	}
+	HANDLE hProc;
 	GetStartupInfoA(&startUp);
-	std::vector<PROCFILE>procFile; procFile.resize(iProc - 1);
-	std::vector<HANDLE>hProc; hProc.resize(iProc - 1);
-	// in for
-	sprintf(commandLine, "printOut %s", "t2222");
-	//printf("%s", commandLine);
-	if (GetTempFileNameA(".", "gtm", 0, procFile[0].tempFile) == 0)
-	{
-		printf("Temp File Name fail"); return 0;
+	if (!CreateProcessA(NULL, pargv, NULL, NULL, TRUE,
+		NORMAL_PRIORITY_CLASS, NULL, NULL, &startUp, &procInfo)) {
+		printf_s("Create Process Fail\n"); return 0;
 	}
-	const char tfile[] = "myTempFile.txt";
-	hTempFile =
-		CreateFileA(tfile,
-			GENERIC_READ | GENERIC_WRITE,
-			FILE_SHARE_READ | FILE_SHARE_WRITE, &stdOutSA,
-			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hTempFile == INVALID_HANDLE_VALUE) {
-		printf("Create Temp File fail"); return 0;
+	hProc = procInfo.hProcess;
+	if (WaitForSingleObject(hProc, INFINITE) != WAIT_OBJECT_0) {
+		printf_s("WaitForSingleObject Fail\n"); return 0;
 	}
-	startUpSearch.dwFlags = STARTF_USESTDHANDLES;
-	startUpSearch.hStdOutput = hTempFile;
-	startUpSearch.hStdError = hTempFile;
-	startUpSearch.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-	if (!CreateProcessA(NULL, commandLine, NULL, NULL,
-		TRUE, dwCreationFlags, NULL, NULL, &startUpSearch, &processInfo)) {
-		printf("Create Process fail"); return 0;
-	}
-	hProc[0] = processInfo.hProcess;
-	CloseHandle(hTempFile); CloseHandle(processInfo.hThread);
-	WaitForMultipleObjects(argc - 1, hProc.data(), TRUE, INFINITE);
-
-	if (GetExitCodeProcess(hProc[0], &exitCode) && exitCode == 1) {
-		fstream fs;
-		fs.open("myTempFile.txt");
-		string t;
-		fs >> t;
-		cout << t << endl;
-		fs.close();
-	}
-	CloseHandle(hProc[0]);
-	if (!DeleteFileA(tfile)) {
-	printf("Delete File fail\0"); return 0;}
+	if (!GetProcessTimes(hProc, &createTime.ft,
+		&exitTime.ft, &kernelTime, &userTime)){
+      printf_s("GetProcessTimes Fail\n"); return 0;}
+	elapsedTime.li = exitTime.li - createTime.li;
+	FileTimeToSystemTime(&elapsedTime.ft, &elTiSys);
+	FileTimeToSystemTime(&kernelTime, &keTiSys);
+	FileTimeToSystemTime(&userTime, &usTiSys);
+	printf("Real Time: %02d:%02d:%02d.%03d\n",
+		elTiSys.wHour, elTiSys.wMinute, elTiSys.wSecond,
+		elTiSys.wMilliseconds);
+	printf("User Time: %02d:%02d:%02d.%03d\n",
+		usTiSys.wHour, usTiSys.wMinute, usTiSys.wSecond,
+		usTiSys.wMilliseconds);
+	printf("Sys Time:  %02d:%02d:%02d.%03d\n",
+		keTiSys.wHour, keTiSys.wMinute, keTiSys.wSecond,
+		keTiSys.wMilliseconds);
+	CloseHandle(procInfo.hThread); CloseHandle(procInfo.hProcess);
 	return 0;
 }
 
