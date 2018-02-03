@@ -22,7 +22,8 @@ LONG GetJobNumber(PROCESS_INFORMATION * pProcessInfo, LPCSTR Command)
 	regionStart.hEvent = (HANDLE)0;
 	GetFileSizeEx(hJobData, &fileSize);
 	fileSizePlus.QuadPart = fileSize.QuadPart + SJM_JOB;
-	LockFileEx(hJobData, LOCKFILE_EXCLUSIVE_LOCK,0, fileSizePlus.LowPart, fileSizePlus.HighPart, &regionStart);
+	bool LockOK=LockFileEx(hJobData, LOCKFILE_EXCLUSIVE_LOCK,0, fileSizePlus.LowPart, fileSizePlus.HighPart, &regionStart);
+	if (!LockOK) 	return -1;
 	while (jobNumber < MAX_JOBS_ALLOWED &&
 		ReadFile(hJobData, &jobRecord, SJM_JOB, &nXfer, NULL) && (nXfer > 0)) {
 		if (jobRecord.ProcessId == 0) break;//empty slot
@@ -46,7 +47,50 @@ LONG GetJobNumber(PROCESS_INFORMATION * pProcessInfo, LPCSTR Command)
 
 BOOL DisplayJobs(void)
 {
-	return 0;
+	HANDLE hJobData, hProcess;
+	JM_JOB jobRecord;
+	DWORD jobNumber = 0, nXfer, exitCode;
+	CHAR jobMgtFileName[MAX_PATH];
+	OVERLAPPED regionStart;
+	if (!GetJobMgtFileName(jobMgtFileName))
+		return FALSE;
+	hJobData = CreateFileA(jobMgtFileName, GENERIC_READ | GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hJobData == INVALID_HANDLE_VALUE)
+		return FALSE;
+	regionStart.Offset = 0;
+	regionStart.OffsetHigh = 0;
+	regionStart.hEvent = (HANDLE)0;
+	LockFileEx(hJobData, LOCKFILE_EXCLUSIVE_LOCK, 0, 0, 0, &regionStart);
+	while (ReadFile(hJobData, &jobRecord, SJM_JOB, &nXfer, NULL) && (nXfer > 0)) {
+		jobNumber++;
+		hProcess = NULL;
+		if (jobRecord.ProcessId == 0) continue;
+		hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, jobRecord.ProcessId);
+		if (hProcess != NULL) {
+			GetExitCodeProcess(hProcess, &exitCode);
+			CloseHandle(hProcess);
+		}
+		printf(" [%d] ", jobNumber);
+		if (NULL == hProcess)printf(" Done");
+		else if (exitCode != STILL_ACTIVE)
+			printf("+ Done");
+		else printf("      ");
+		printf(" %s\n", jobRecord.CommandLine);
+		if (NULL == hProcess) {
+			SetFilePointer(hJobData, -(LONG)nXfer, NULL, FILE_CURRENT);
+			jobRecord.ProcessId = 0;
+			if (!WriteFile(hJobData, &jobRecord, SJM_JOB, &nXfer, NULL))
+			{
+				printf("Write Error\n"); return 0;
+			}
+		}
+	}
+	UnlockFileEx(hJobData, 0, 0, 0, &regionStart);
+	if (NULL != hProcess) CloseHandle(hProcess);
+	CloseHandle(hJobData);
+	return TRUE;
 }
 
 DWORD FindProcessId(DWORD jobNumber)
