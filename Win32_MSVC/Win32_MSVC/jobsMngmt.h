@@ -1,5 +1,14 @@
 #pragma once
 #include "Everything.h" 
-LONG GetJobNumber(PROCESS_INFORMATION *pProcessInfo, LPCTSTR Command);
+#define JM_EXIT_CODE 0x1000
+#define MAX_JOBS_ALLOWED 10000
+#define SJM_JOB sizeof(JM_JOB)
+struct JM_JOB
+{
+	DWORD ProcessId;
+	CHAR CommandLine[MAX_PATH];
+};
+LONG GetJobNumber(PROCESS_INFORMATION *pProcessInfo, LPCSTR Command);
 BOOL DisplayJobs(void);
 DWORD FindProcessId(DWORD jobNumber);
+BOOL GetJobMgtFileName(LPSTR jobMgtFileName);
