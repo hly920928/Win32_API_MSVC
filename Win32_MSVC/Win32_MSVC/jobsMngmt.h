@@ -12,3 +12,7 @@ LONG GetJobNumber(PROCESS_INFORMATION *pProcessInfo, LPCSTR Command);
 BOOL DisplayJobs(void);
 DWORD FindProcessId(DWORD jobNumber);
 BOOL GetJobMgtFileName(LPSTR jobMgtFileName);
+
+static int Jobbg(int, LPSTR *, LPSTR);
+static int Jobs(int, LPSTR *, LPSTR);
+static int Kill(int, LPSTR *, LPSTR);

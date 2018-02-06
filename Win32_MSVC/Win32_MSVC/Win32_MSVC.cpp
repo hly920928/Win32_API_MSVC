@@ -1,5 +1,4 @@
 // Win32_MSVC.cpp : Defines the entry point for the console application.
-//
 #include "stdafx.h"
 #include <cstdio>
 #include <iostream>
@@ -8,6 +7,7 @@
 #include "Everything.h" 
 #include "myHeader_V2.h" 
 #include <string>
+#include "jobsMngmt.h";
 typedef void(*ptr1)(char*) ;
 using namespace std;
 struct PROCFILE {

@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "jobsMngmt.h";
-
+#include "helperFunction.h";
 LONG GetJobNumber(PROCESS_INFORMATION * pProcessInfo, LPCSTR Command)
 {
 	HANDLE hJobData, hProcess;
@@ -95,6 +95,34 @@ BOOL DisplayJobs(void)
 
 DWORD FindProcessId(DWORD jobNumber)
 {
+	HANDLE hJobData;
+	JM_JOB jobRecord;
+	DWORD nXfer, fileSizeLow;
+	CHAR jobMgtFileName[MAX_PATH + 1];
+	OVERLAPPED regionStart;
+	LARGE_INTEGER fileSize;
+	if (!GetJobMgtFileName(jobMgtFileName)) return 0;
+	hJobData = CreateFileA(jobMgtFileName, GENERIC_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hJobData == INVALID_HANDLE_VALUE) return 0;
+	if (!GetFileSizeEx(hJobData, &fileSize) ||
+		(fileSize.HighPart != 0 ||  //InVaild fileSize
+			SJM_JOB * (jobNumber - 1) > fileSize.LowPart //InVaild jobNumber
+			|| fileSize.LowPart > SJM_JOB * MAX_JOBS_ALLOWED))
+		return 0;
+	fileSizeLow = fileSize.LowPart;
+	SetFilePointer(hJobData, SJM_JOB * (jobNumber - 1), NULL, FILE_BEGIN);
+	regionStart.Offset = SJM_JOB * (jobNumber - 1);
+	regionStart.OffsetHigh = 0; 
+	regionStart.hEvent = (HANDLE)0;
+	LockFileEx(hJobData, 0, 0, SJM_JOB, 0, &regionStart);
+	if (!ReadFile(hJobData, &jobRecord, SJM_JOB, &nXfer, NULL))
+	{
+		printf("ReadFile Fail\n"); return 0;
+	}
+	UnlockFileEx(hJobData, 0, SJM_JOB, 0, &regionStart);
+	CloseHandle(hJobData);
 	return 0;
 }
 
@@ -108,4 +136,60 @@ BOOL GetJobMgtFileName(LPSTR jobMgtFileName)
 		return FALSE;
 	sprintf_s(jobMgtFileName, MAX_PATH, "%s%s%s", TempPath, UserName, ".JobMgt");
 	return TRUE;
+}
+
+int Jobbg(int argc, LPSTR argv[], LPSTR command)
+{
+	printf("argc=%d\n", argc);
+	printf("argv= \n", argc);
+	for(int i=0;i<argc;i++)
+		printf("%s ", argv[i]);
+	printf("\n", argc);
+	printf("command = %s\n", command);
+	//parse argv
+	DWORD fCreate;
+	LONG jobNumber;
+	BOOL flags[2];
+	STARTUPINFOA StartUp;
+	PROCESS_INFORMATION processInfo;
+	LPSTR targv = SkipArg(command, 1, argc, argv);
+	GetStartupInfoA(&StartUp);
+	Options(argc, argv, "cd", &flags[0], &flags[1], NULL);
+	if (argv[1][0] == '-')
+		targv = SkipArg(command, 2, argc, argv);
+	fCreate = flags[0] ? CREATE_NEW_CONSOLE : flags[1] ? DETACHED_PROCESS : 0;
+	//////////////
+	if (!CreateProcessA(NULL, targv, NULL, NULL, TRUE,
+		fCreate | CREATE_SUSPENDED | CREATE_NEW_PROCESS_GROUP,
+		NULL, NULL, &StartUp, &processInfo)) {
+		printf("Create Process Fail\n");
+
+		return 4;
+	}
+	//////////////
+	jobNumber = GetJobNumber(&processInfo, targv);
+	if (jobNumber >= 0)
+		ResumeThread(processInfo.hThread);
+	else {
+		TerminateProcess(processInfo.hProcess, 3);
+		CloseHandle(processInfo.hThread);
+		CloseHandle(processInfo.hProcess);
+		printf("Error: No room in job control list.\n");
+		return 5;
+	}
+	CloseHandle(processInfo.hThread);
+	CloseHandle(processInfo.hProcess);
+	printf(" [%d] %d\n", jobNumber, processInfo.dwProcessId);
+	return 0;
+}
+
+int Jobs(int, LPSTR *, LPSTR)
+{
+	if (!DisplayJobs()) return 1;
+	return 0;
+}
+
+int Kill(int, LPSTR *, LPSTR)
+{
+	return 0;
 }
