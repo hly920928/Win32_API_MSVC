@@ -8,44 +8,41 @@
 #include "myHeader_V2.h" 
 #include <string>
 #include "jobsMngmt.h";
-using namespace std;
+#include "helperFunction.h"
 static bool exitFlag;
-BOOL WINAPI myHandler(DWORD cntrlEvent)
-{
-	printf("In Looping Sleep\n");
-	switch (cntrlEvent) {
-	case CTRL_C_EVENT:
-		printf("Ctrl-C received by handler\n");
-		exitFlag = TRUE;
-		return TRUE;
-	case CTRL_CLOSE_EVENT:
-		printf("Close event received by handler\n");
-		exitFlag = TRUE;
-		return TRUE; 
-	default:
-		printf("Event: %d received by handler. Leaving in 5 seconds or less.\n", cntrlEvent);
-		exitFlag = TRUE;
-		return TRUE; 
-	}
-}
-
 int main(int argc, LPCSTR argv[])
 {
-	exitFlag = false;
-	if (!SetConsoleCtrlHandler(myHandler, TRUE))
-	{
-		printf("Error setting event handler"); return 0;
-	}
-	if (argc == 1) {
-		printf("Please input sleepLong\n");
-		return 0;
-	}
-	
-	int sleepLong = atoi(argv[1]);
+	BOOL exitFlag = FALSE;
+	CHAR command[MAX_COMMAND_LINE], *pc;
+	DWORD i, localArgc; 
+	CHAR argstr[MAX_ARG][MAX_COMMAND_LINE];
+	LPSTR pArgs[MAX_ARG];
+	for (i = 0; i < MAX_ARG; i++)
+		pArgs[i] = argstr[i];
+	printf("Simple Job Mangement\n");
 	while (!exitFlag) {
-		printf("Loop Sleeping %d\n", sleepLong);
-		Sleep(sleepLong);
+		printf("%s", "JM$");
+		fgets(command, MAX_COMMAND_LINE, stdin);
+		pc = strchr(command, '\n');
+		*pc = '\0';
+		GetArgs(command, &localArgc, pArgs);
+		CharLowerA(argstr[0]);
+
+		if (strcmp(argstr[0], "jobbg") == 0) {
+			Jobbg(localArgc, pArgs, command);
+		}
+		else if (strcmp(argstr[0], "jobs") == 0) {
+			Jobs(localArgc, pArgs, command);
+		}
+		else if (strcmp(argstr[0], "kill") == 0) {
+			Kill(localArgc, pArgs, command);
+		}
+		else if (strcmp(argstr[0], "quit") == 0) {
+			exitFlag = TRUE;
+		}
+		else printf("Invalid command. Try again.\n");
 	}
+
 	return 0;
 }
 

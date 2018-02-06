@@ -13,6 +13,6 @@ BOOL DisplayJobs(void);
 DWORD FindProcessId(DWORD jobNumber);
 BOOL GetJobMgtFileName(LPSTR jobMgtFileName);
 
-static int Jobbg(int, LPSTR *, LPSTR);
-static int Jobs(int, LPSTR *, LPSTR);
-static int Kill(int, LPSTR *, LPSTR);
+ int Jobbg(int, LPSTR *, LPSTR);
+ int Jobs(int, LPSTR *, LPSTR);
+ int Kill(int, LPSTR *, LPSTR);

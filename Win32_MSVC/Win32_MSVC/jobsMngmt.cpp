@@ -77,7 +77,7 @@ BOOL DisplayJobs(void)
 		if (NULL == hProcess)printf(" Done");
 		else if (exitCode != STILL_ACTIVE)
 			printf("+ Done");
-		else printf("      ");
+		else printf("     ");
 		printf(" %s\n", jobRecord.CommandLine);
 		if (NULL == hProcess) {
 			SetFilePointer(hJobData, -(LONG)nXfer, NULL, FILE_CURRENT);
@@ -90,7 +90,8 @@ BOOL DisplayJobs(void)
 	}
 	UnlockFileEx(hJobData, 0, 0, 0, &regionStart);
 	if (NULL != hProcess) CloseHandle(hProcess);
-	CloseHandle(hJobData);
+	if (hJobData != INVALID_HANDLE_VALUE)
+	    CloseHandle(hJobData);
 	return TRUE;
 }
 
@@ -124,7 +125,7 @@ DWORD FindProcessId(DWORD jobNumber)
 	}
 	UnlockFileEx(hJobData, 0, SJM_JOB, 0, &regionStart);
 	CloseHandle(hJobData);
-	return 0;
+	return jobRecord.ProcessId;
 }
 
 BOOL GetJobMgtFileName(LPSTR jobMgtFileName)
@@ -139,7 +140,7 @@ BOOL GetJobMgtFileName(LPSTR jobMgtFileName)
 	return TRUE;
 }
 
-int Jobbg(int argc, LPSTR argv[], LPSTR command)
+int Jobbg(int argc, LPSTR* argv, LPSTR command)
 {
 	printf("argc=%d\n", argc);
 	printf("argv= \n", argc);
@@ -190,7 +191,8 @@ int Jobs(int, LPSTR *, LPSTR)
 	return 0;
 }
 
-int Kill(int argc, LPSTR argv[], LPSTR command)
+
+int Kill(int argc, LPSTR* argv, LPSTR command)
 {
 	printf("argc=%d\n", argc);
 	printf("argv= \n", argc);
@@ -215,12 +217,15 @@ int Kill(int argc, LPSTR argv[], LPSTR command)
 		printf("Process already terminated.\n");
 		return 2;
 	}
+	killed = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, processId);
+	/*
 	if (cntrlB)
 		killed = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
 	else if (cntrlC)
 		killed = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
 	else
 		killed = TerminateProcess(hProcess, JM_EXIT_CODE);
+	*/
 	if (!killed) {
 		printf("Process termination failed.\n");
 		return 3;
@@ -228,6 +233,5 @@ int Kill(int argc, LPSTR argv[], LPSTR command)
 	WaitForSingleObject(hProcess, 5000);
 	CloseHandle(hProcess);
 	printf("Job [%d] terminated or timed out\n", jobNumber);
-	return 0;
 	return 0;
 }
