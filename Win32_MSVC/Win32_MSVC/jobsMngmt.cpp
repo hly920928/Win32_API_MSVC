@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "jobsMngmt.h";
 #include "helperFunction.h";
+#include "myHeader_V2.h" 
 LONG GetJobNumber(PROCESS_INFORMATION * pProcessInfo, LPCSTR Command)
 {
 	HANDLE hJobData, hProcess;
@@ -189,7 +190,44 @@ int Jobs(int, LPSTR *, LPSTR)
 	return 0;
 }
 
-int Kill(int, LPSTR *, LPSTR)
+int Kill(int argc, LPSTR argv[], LPSTR command)
 {
+	printf("argc=%d\n", argc);
+	printf("argv= \n", argc);
+	for (int i = 0; i<argc; i++)
+		printf("%s ", argv[i]);
+	printf("\n", argc);
+	printf("command = %s\n", command);
+	///parse input
+	DWORD processId, jobNumber, iJobNo;
+	HANDLE hProcess;
+	BOOL cntrlC, cntrlB, killed;
+	iJobNo = Options(argc, argv, "bc", &cntrlB, &cntrlC, NULL);
+	jobNumber = atoi(argv[iJobNo]);
+	///
+	processId = FindProcessId(jobNumber);
+	if (processId == 0) {
+		printf("Job number not found.\n");
+		return 1;
+	}
+	hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, processId);
+	if (hProcess == NULL) {
+		printf("Process already terminated.\n");
+		return 2;
+	}
+	if (cntrlB)
+		killed = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
+	else if (cntrlC)
+		killed = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+	else
+		killed = TerminateProcess(hProcess, JM_EXIT_CODE);
+	if (!killed) {
+		printf("Process termination failed.\n");
+		return 3;
+	}
+	WaitForSingleObject(hProcess, 5000);
+	CloseHandle(hProcess);
+	printf("Job [%d] terminated or timed out\n", jobNumber);
+	return 0;
 	return 0;
 }
