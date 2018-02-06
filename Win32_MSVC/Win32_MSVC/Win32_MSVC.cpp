@@ -8,57 +8,44 @@
 #include "myHeader_V2.h" 
 #include <string>
 #include "jobsMngmt.h";
-typedef void(*ptr1)(char*) ;
 using namespace std;
-struct PROCFILE {
-	CHAR tempFile[100];
-};
-union wtime {	
-	LONGLONG li;
-	FILETIME ft;
-};
+static bool exitFlag;
+BOOL WINAPI myHandler(DWORD cntrlEvent)
+{
+	printf("In Looping Sleep\n");
+	switch (cntrlEvent) {
+	case CTRL_C_EVENT:
+		printf("Ctrl-C received by handler\n");
+		exitFlag = TRUE;
+		return TRUE;
+	case CTRL_CLOSE_EVENT:
+		printf("Close event received by handler\n");
+		exitFlag = TRUE;
+		return TRUE; 
+	default:
+		printf("Event: %d received by handler. Leaving in 5 seconds or less.\n", cntrlEvent);
+		exitFlag = TRUE;
+		return TRUE; 
+	}
+}
+
 int main(int argc, LPCSTR argv[])
-{	
-	STARTUPINFOA startUp;
-	PROCESS_INFORMATION procInfo;
-	wtime createTime, exitTime, elapsedTime;
-	FILETIME kernelTime, userTime;
-	SYSTEMTIME elTiSys, keTiSys, usTiSys;
-	LPSTR pargv = GetCommandLineA();
-	//skip first argv
-	while (*pargv!= ' ') {
-		pargv++;
+{
+	exitFlag = false;
+	if (!SetConsoleCtrlHandler(myHandler, TRUE))
+	{
+		printf("Error setting event handler"); return 0;
 	}
-	while (*pargv == ' ') {
-		pargv++;
+	if (argc == 1) {
+		printf("Please input sleepLong\n");
+		return 0;
 	}
-	HANDLE hProc;
-	GetStartupInfoA(&startUp);
-	if (!CreateProcessA(NULL, pargv, NULL, NULL, TRUE,
-		NORMAL_PRIORITY_CLASS, NULL, NULL, &startUp, &procInfo)) {
-		printf_s("Create Process Fail\n"); return 0;
+	
+	int sleepLong = atoi(argv[1]);
+	while (!exitFlag) {
+		printf("Loop Sleeping %d\n", sleepLong);
+		Sleep(sleepLong);
 	}
-	hProc = procInfo.hProcess;
-	if (WaitForSingleObject(hProc, INFINITE) != WAIT_OBJECT_0) {
-		printf_s("WaitForSingleObject Fail\n"); return 0;
-	}
-	if (!GetProcessTimes(hProc, &createTime.ft,
-		&exitTime.ft, &kernelTime, &userTime)){
-      printf_s("GetProcessTimes Fail\n"); return 0;}
-	elapsedTime.li = exitTime.li - createTime.li;
-	FileTimeToSystemTime(&elapsedTime.ft, &elTiSys);
-	FileTimeToSystemTime(&kernelTime, &keTiSys);
-	FileTimeToSystemTime(&userTime, &usTiSys);
-	printf("Real Time: %02d:%02d:%02d.%03d\n",
-		elTiSys.wHour, elTiSys.wMinute, elTiSys.wSecond,
-		elTiSys.wMilliseconds);
-	printf("User Time: %02d:%02d:%02d.%03d\n",
-		usTiSys.wHour, usTiSys.wMinute, usTiSys.wSecond,
-		usTiSys.wMilliseconds);
-	printf("Sys Time:  %02d:%02d:%02d.%03d\n",
-		keTiSys.wHour, keTiSys.wMinute, keTiSys.wSecond,
-		keTiSys.wMilliseconds);
-	CloseHandle(procInfo.hThread); CloseHandle(procInfo.hProcess);
 	return 0;
 }
 
