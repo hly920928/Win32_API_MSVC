@@ -140,7 +140,7 @@ BOOL GetJobMgtFileName(LPSTR jobMgtFileName)
 	return TRUE;
 }
 
-int Jobbg(int argc, LPSTR* argv, LPSTR command)
+int Jobbg(int argc, LPSTR* argv, LPSTR command, HANDLE hJobObject)
 {
 	printf("argc=%d\n", argc);
 	printf("argv= \n", argc);
@@ -179,15 +179,37 @@ int Jobbg(int argc, LPSTR* argv, LPSTR command)
 		printf("Error: No room in job control list.\n");
 		return 5;
 	}
+	//job object
+	if (hJobObject != NULL)
+	{
+		if (!AssignProcessToJobObject(hJobObject, processInfo.hProcess)) {
+			printf("Could not add process to job object. The process will be terminated.\n");
+			TerminateProcess(processInfo.hProcess, 4);
+			CloseHandle(processInfo.hThread);
+			CloseHandle(processInfo.hProcess);
+			return 4;
+		}
+	}else printf("hJobObject is Null \n");
+	//
 	CloseHandle(processInfo.hThread);
 	CloseHandle(processInfo.hProcess);
 	printf(" [%d] %d\n", jobNumber, processInfo.dwProcessId);
 	return 0;
 }
 
-int Jobs(int, LPSTR *, LPSTR)
+int Jobs(int, LPSTR *, LPSTR, HANDLE hJobObject)
 {
 	if (!DisplayJobs()) return 1;
+	JOBOBJECT_BASIC_ACCOUNTING_INFORMATION basicInfo;
+	if (!QueryInformationJobObject(hJobObject, JobObjectBasicAccountingInformation, &basicInfo, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION), NULL)) {
+		printf("Failed QueryInformationJobObject\n");
+		return 0;
+	}
+	printf("Total Processes: %d, Active: %d, Terminated: %d.\n",
+		basicInfo.TotalProcesses, basicInfo.ActiveProcesses, basicInfo.TotalTerminatedProcesses);
+	printf("User time all processes: %d.%03d\n",
+		basicInfo.TotalUserTime.QuadPart / MILLION, (basicInfo.TotalUserTime.QuadPart % MILLION) / 10000);
+
 	return 0;
 }
 

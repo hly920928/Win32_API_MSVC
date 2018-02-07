@@ -22,6 +22,7 @@ struct _TREENODE {
 #define MAX_DATA_LEN 0x1000
 #define TKEY_SIZE KEY_SIZE * sizeof (CHAR)
 #define ERROR_STATUS_FILE 0xE0000001
+#define MILLION 1000000
 static int nFile;
 LPTNODE FillTree(HANDLE, HANDLE, HANDLE);
 BOOL Scan(LPTNODE);
