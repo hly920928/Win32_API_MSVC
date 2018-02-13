@@ -9,65 +9,63 @@
 #include <string>
 #include "jobsMngmt.h";
 #include "helperFunction.h"
-static bool exitFlag;
+using namespace std;
+struct thread_arg {
+	int id;
+	vector<vector<string>>* output;
+	string file_n;
+	string pattern;
 
+}
+typedef   ptr_thread_arg (thread_arg*) ;
+static DWORD WINAPI patternSearch_MT(thread_arg* pArgs);
 int main(int argc, LPCSTR argv[])
 {
-	if (argc == 1) {
-		printf("Please Input Time Limit\n"); return 0;
-	}
-	HANDLE hJobObject;
-	LARGE_INTEGER processTimeLimit;
-	//processTimeLimit.QuadPart = 60;
-	BOOL exitFlag = FALSE;
-	CHAR command[MAX_COMMAND_LINE], *pc;
-	DWORD i, localArgc; 
-	CHAR argstr[MAX_ARG][MAX_COMMAND_LINE];
-	LPSTR pArgs[MAX_ARG];
-	for (i = 0; i < MAX_ARG; i++)
-		pArgs[i] = argstr[i];
-	printf("Simple Job Mangement\n");
-	//job objects
-	
-	hJobObject = NULL;
-	processTimeLimit.QuadPart = 0;
-	if (argc >= 2) processTimeLimit.QuadPart = atoi((char*)argv[1]);
-	basicLimits.PerProcessUserTimeLimit.QuadPart = processTimeLimit.QuadPart * MILLION;
 
-	hJobObject = CreateJobObject(NULL, NULL);
-	if (NULL == hJobObject)
-	{
-		printf("Error creating job object.\n"); return 0;
-	}
-	if (!SetInformationJobObject(hJobObject, JobObjectBasicLimitInformation, &basicLimits, sizeof(JOBOBJECT_BASIC_LIMIT_INFORMATION)))
-	{
-		printf("Error setting job object information.\n"); return 0;
-	}
-	//
-	while (!exitFlag) {
-		printf("%s", "JM$");
-		fgets(command, MAX_COMMAND_LINE, stdin);
-		pc = strchr(command, '\n');
-		*pc = '\0';
-		GetArgs(command, &localArgc, pArgs);
-		CharLowerA(argstr[0]);
-
-		if (strcmp(argstr[0], "jobbg") == 0) {
-			Jobbg(localArgc, pArgs, command,hJobObject);
-		}
-		else if (strcmp(argstr[0], "jobs") == 0) {
-			Jobs(localArgc, pArgs, command, hJobObject);
-		}
-		else if (strcmp(argstr[0], "kill") == 0) {
-			Kill(localArgc, pArgs, command);
-		}
-		else if (strcmp(argstr[0], "quit") == 0) {
-			exitFlag = TRUE;
-		}
-		else printf("Invalid command. Try again.\n");
-	}
-	CloseHandle(hJobObject);
+	vector<vector<string>>output;
+	//output.resize(argc - 2);
+	output.resize(1);
+	thread_arg* pthread_arg = new thread_arg();
+	pthread_arg->id = 0;
+	pthread_arg->output = &output;
+	pthread_arg->pattern = "123456";
+	pthread_arg->file_n = "1.txt";
+	HANDLE tHandle[1024];
+	tHandle[0] =(HANDLE)_beginthreadex(NULL, 0, (_beginthreadex_proc_type)patternSearch_MT, pthread_arg, 0, NULL);
+	WaitForSingleObject(tHandle[0], INFINITE);
+	int a = 6;
 	return 0;
 }
 
+static DWORD WINAPI patternSearch_MT(thread_arg* pArgs)
+{
+	int tid = GetCurrentThreadId();
+	printf("tid = %d\n", tid);
+	ifstream fi; fi.open(pArgs->file_n);
+	if (fi.fail()) {
+		printf("Open_File_Fail\n");
+	}
+	int id = pArgs->id;
+	string s;
+	string pt = pArgs->pattern; const char* p= nullptr;
+	while (true) {
+		fi >> s;
+		if (fi.eof())break;
+		p=strstr(s.data(), pt.data());
+		if (p != nullptr) {
+			auto& v1=*pArgs->output;
+			auto& v2 = v1[id];
+			v2.push_back(s);
+		}
+	}
+		/*
+		  FILE *fp;
+		  char file[] = "1.txt";
+		  if ((fp = fopen(file, "rb")) == NULL) {
 
+		  }
+		*/
+		delete pArgs;
+		fi.close();
+	return 0;
+}
