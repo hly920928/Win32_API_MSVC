@@ -33,138 +33,37 @@ struct Record {
 		return false;
 	}
 };
-struct sort_thread_arg {
-	unsigned char id;
-	unsigned char threadNum;
-	HANDLE* hArr;
-	Record* head;
-	Record* end;
-	sort_thread_arg* argArr;
+struct fiberArg {
+	LPVOID*  fibs;
+	int id;
 };
-void RandomRecord(Record* header, int n) {
-	Record* ptr = header;
-	for (int i = 0; i < n; i++) {
-		auto& temp= *ptr;
-		for (int t = 0; t < 8; t++) {
-			int tt = rand() % 10;
-			temp[t] = tt+'0';
-		}
-		temp[8] = '\0';
-		temp[9] = '\r\n';
-		ptr++;
-	}
-	char t[16]= "AAAAAAAA\0\r\n";
-	copy(t, t + 10, ptr->t);
-}
-static DWORD WINAPI sort_MT(sort_thread_arg* pArgs);
+static int num =7;
+static DWORD WINAPI fiber_Test(fiberArg* pArgs);
 int main(int argc, LPCSTR argv[])
 {
-	if (argc < 3) {
-		printf("Command Line incorrent\n");
-		return 0;
-	}
-	char fileName[999];
-	strcpy(fileName, argv[1]);
-	int threadNum = atoi(argv[2]);
 	
-	//check threadNum
-	{
-		int threadNumber[] = {
-			1,2,4,8,16,32,64,128,256 };
-		bool f1 = false;
-		for (int i : threadNumber) {
-			if (threadNum == i) {
-				f1 = true;
-				break;
-			}
-		}
-		if (!f1) {
-			printf("threadNum InValid\n");
-			goto END;
-		}
-	}
-	//open file
-	HANDLE hFile = CreateFileA(fileName, GENERIC_READ | GENERIC_WRITE,
-		                                            0, NULL, OPEN_EXISTING, 0, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		printf("Failure to open input file.\n");
-		goto END;
-	}
-	long long fileSize = -1;
-	int nOfRecord = 60;
-	if (!SetFilePointer(hFile, (nOfRecord + 1) * sizeof(Record), 0, FILE_BEGIN)|| !SetEndOfFile(hFile)) {
-		printf("Failure to SetEndOfFile.\n");
-		goto END;
-	}
-	HANDLE mHandle = CreateFileMapping(hFile, NULL, PAGE_READWRITE, 0, 0, NULL);
-	if (NULL == mHandle) {
-        printf("Failure to create mapping handle on input file.\n");
-		goto END;
-	}
-	Record* pRecords = (Record*)MapViewOfFile(mHandle, FILE_MAP_ALL_ACCESS, 0, 0,0);
-	RandomRecord(pRecords, nOfRecord);
-	
-	if (NULL == pRecords) {
-		printf("Failure to map input file.\n");
-		goto END;
-	}
-	HANDLE aHandle[MAXTHREAD];
-	sort_thread_arg argArr[MAXTHREAD];
-	int part = nOfRecord / threadNum;
-	for (int i = 0; i < threadNum; i++) {
-		argArr[i].id = i;
-		argArr[i].threadNum = threadNum;
-		argArr[i].hArr = aHandle;
-		argArr[i].argArr = argArr;
-		argArr[i].head = pRecords + i*part;
-		if (i != threadNum - 1) 
-			argArr[i].end = pRecords + (i + 1)*part;
-		else argArr[i].end = pRecords + nOfRecord;
 
-		aHandle[i]= (HANDLE)_beginthreadex(
-			NULL, 0,(_beginthreadex_proc_type) sort_MT, &argArr[i], 
-			CREATE_SUSPENDED, NULL);
+	LPVOID FiberID[99];
+	fiberArg fbArg[99];
+	FiberID[0]=ConvertThreadToFiber(NULL);
+	for (int i = 1; i <num; i++) {
+		fbArg[i].fibs = FiberID;
+		fbArg[i].id = i;
+		FiberID[i]=CreateFiber(1, (LPFIBER_START_ROUTINE)fiber_Test, &fbArg[i]);
 	}
-	for (int i= 0; i < threadNum; i++)
-		ResumeThread(aHandle[i]);
-	//WaitForMultipleObjects(threadNum, aHandle, TRUE, INFINITE);
-	WaitForSingleObject(aHandle[0], INFINITE);
-	
-//Clear up	
-END:
-	for (int i = 0; i < threadNum; i++)
-		CloseHandle(aHandle[i]);
-	UnmapViewOfFile(aHandle);
-	CloseHandle(mHandle);
-	CloseHandle(hFile);
+	SwitchToFiber(FiberID[1]);
+	printf("Back From Switch fiber 0\n");
+	int t = 5;
 	return 0;
 }
 
-static DWORD WINAPI sort_MT(sort_thread_arg* pArgs)
+DWORD WINAPI fiber_Test(fiberArg* pArgs)
 {
-	sort(pArgs->head, pArgs->end);
-	int d = 1; bool flag = false;
 	while (true) {
-		flag = false;
-		for (int i = 0; i < pArgs->threadNum; i += d * 2) {
-			if (d >= pArgs->threadNum)break;
-			if (pArgs->id==i) {
-				flag = true;
-				break;
-			}
-		}
-		if (!flag)break;
-		int nextID = pArgs->id + d;
-		WaitForSingleObject(pArgs->hArr[nextID], INFINITE);
-		int totalNum = pArgs->argArr[nextID].end - pArgs->head;
-		Record* mergePlace = new Record[totalNum];
-		merge(pArgs->head, pArgs->end, 
-			      pArgs->argArr[nextID].head, pArgs->argArr[nextID].end,
-			      mergePlace);
-		copy(mergePlace, mergePlace + totalNum, pArgs->head);
-		pArgs->end = pArgs->argArr[nextID].end;
-		delete[]mergePlace;
-		d *= 2;
+		printf("In fiber %d\n", pArgs->id);
+		int nextID = rand() % num;
+		SwitchToFiber((LPVOID)pArgs->fibs[nextID]);
+		printf("Back From Switch fiber %d\n", pArgs->id);
 	}
 	return 0;
 }
