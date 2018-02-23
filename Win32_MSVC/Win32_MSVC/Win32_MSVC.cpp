@@ -24,14 +24,32 @@ DWORD WINAPI Produce(void*);
 DWORD WINAPI Consume(void*);
 void MessageFill(msgBlock *);
 void MessageDisplay(msgBlock *);
+msgBlock gobalBlock = { 0, 0, 0, 0, 0 };
 int main(int argc, LPCSTR argv[])
 {
-
+	
+  
 	return 0;
 }
 
-DWORD WINAPI Produce(void* ptr)
+DWORD WINAPI Produce(void* args)
 {
+	SYSTEMTIME st;
+	GetSystemTime(&st);
+	srand(st.wMilliseconds);
+	while (!gobalBlock.fStop) {
+		Sleep(rand() / 100);
+		EnterCriticalSection(&gobalBlock.mGuard);//Enter CS
+		__try {
+			if (!gobalBlock.fStop) {
+				gobalBlock.fReady = 0;
+				MessageFill(&gobalBlock);
+				gobalBlock.fReady = 1;
+				InterlockedIncrement(&gobalBlock.mSequence);
+			}
+		}
+		__finally { LeaveCriticalSection(&gobalBlock.mGuard); }//Leave CS
+	}
 	return 0;
 };
 
