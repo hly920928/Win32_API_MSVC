@@ -53,8 +53,33 @@ DWORD WINAPI Produce(void* args)
 	return 0;
 };
 
-DWORD WINAPI Consume(void* ptr)
+DWORD WINAPI Consume(void* args)
 {
+	CHAR command, extra;
+	while (!gobalBlock.fStop) {
+		printf("Enter 'c' for Consume; 's' to stop: ");
+		scanf("%c%c", &command, &extra);
+		if (command == 's') {
+			gobalBlock.fStop = 1;
+		}
+		else if (command == 'c') {
+			EnterCriticalSection(&gobalBlock.mGuard);
+			__try {
+				if (gobalBlock.fReady == 0)
+					printf("No new messages. Try again later\n");
+				else {
+					MessageDisplay(&gobalBlock);
+					gobalBlock.nLost = gobalBlock.mSequence - gobalBlock.nCons + 1;
+					gobalBlock.fReady = 0; /* No new messages are ready */
+					InterlockedIncrement(&gobalBlock.nCons);
+				}
+			}
+			__finally { LeaveCriticalSection(&gobalBlock.mGuard); }
+		}
+		else {
+			printf("Illegal command. Try again.\n");
+		}
+	}
 	return 0;
 }
 void MessageFill(msgBlock *)
