@@ -1,6 +1,7 @@
 // Win32_MSVC.cpp : Defines the entry point for the console application.
 #include "stdafx.h"
 #include <cstdio>
+#include <ctime>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -34,11 +35,9 @@ int main(int argc, LPCSTR argv[])
 
 DWORD WINAPI Produce(void* args)
 {
-	SYSTEMTIME st;
-	GetSystemTime(&st);
-	srand(st.wMilliseconds);
+	srand((DWORD)time(NULL));
 	while (!gobalBlock.fStop) {
-		Sleep(rand() / 100);
+		Sleep(1500+rand() / 100);
 		EnterCriticalSection(&gobalBlock.mGuard);//Enter CS
 		__try {
 			if (!gobalBlock.fStop) {
@@ -82,10 +81,33 @@ DWORD WINAPI Consume(void* args)
 	}
 	return 0;
 }
-void MessageFill(msgBlock *)
+void MessageFill(msgBlock * msgBlock)
 {
+	DWORD i;
+
+	msgBlock->mChecksum = 0;
+	for (i = 0; i < DATA_SIZE; i++) {
+		msgBlock->mData[i] = rand();
+		msgBlock->mChecksum ^= msgBlock->mData[i];//produce Checksum  
+	}
+	msgBlock->mTimestamp = time(NULL);
+	return;
 }
-void MessageDisplay(msgBlock *)
+void MessageDisplay(msgBlock * msgBlock )
 {
+	DWORD i, tcheck = 0;
+
+	for (i = 0; i < DATA_SIZE; i++)
+		tcheck ^= msgBlock->mData[i];//produce Checksum  
+	printf("\nMessage number %d generated at: %s"),
+		msgBlock->mSequence, ctime(&(msgBlock->mTimestamp));
+	printf("First and last entries: %x %x\n",
+		msgBlock->mData[0], msgBlock->mData[DATA_SIZE - 1]);
+	if (tcheck == msgBlock->mChecksum) //Check Checksum
+		printf("GOOD ->mChecksum was validated.\n");
+	else
+		printf("BAD  ->mChecksum failed. message was corrupted\n");
+
+	return;
 }
 ;
