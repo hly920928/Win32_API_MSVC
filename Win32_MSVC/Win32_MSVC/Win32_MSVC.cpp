@@ -47,8 +47,44 @@ int main(int argc, LPCSTR argv[])
 		pWorkObjArgsArray = (workArg**)malloc(nThread * sizeof(workArg*));
 
 	if (pWorkObjects == NULL || pWorkObjArgsArray == NULL) {
-		printf("malloc Fail");
+		printf("malloc Fail\n"); return 0;
 	}
+	InitializeThreadpoolEnvironment(&cbe);// Init the Threadpool
+	//Create Each Work
+	for (iThread = 0; iThread < nThread; iThread++) {
+		pThreadArg = (pWorkObjArgsArray[iThread] =(workArg*) _aligned_malloc(sizeof(workArg), CACHE_LINE_SIZE));
+		if (NULL == pThreadArg) {
+			printf("malloc Fail\n"); return 0;
+		}
+		//Fill Arg
+		pThreadArg->objectNumber = iThread;
+		pThreadArg->tasksToComplete = tasksPerThread;
+		pThreadArg->tasksComplete = 0;
+		pThreadArg->slimRWL = srwl;
+		// Create Work
+		pWorkObjects[iThread] = CreateThreadpoolWork(Worker, pThreadArg, &cbe);
+		if (pWorkObjects[iThread] == NULL) {
+			printf("Create Work Fail\n"); return 0;
+		}
+		// Submit Work
+		SubmitThreadpoolWork(pWorkObjects[iThread]);
+	}
+	for (iThread = 0; iThread < nThread; iThread++) {
+		//Wait Each Work
+		WaitForThreadpoolWorkCallbacks(pWorkObjects[iThread], FALSE);
+		//Close Each Work
+		CloseThreadpoolWork(pWorkObjects[iThread]);
+	}
+	printf("All Work Finish\n");
+	totalTasksComplete = 0;
+	for (iThread = 0; iThread < nThread; iThread++) {
+		pThreadArg = pWorkObjArgsArray[iThread];
+		if (traceFlag) printf("Tasks completed by thread %d: %d\n", iThread, pThreadArg->tasksComplete);
+		totalTasksComplete += pThreadArg->tasksComplete;
+		//_aligned_free 
+		_aligned_free(pThreadArg);
+	}
+	if (traceFlag) printf("Total work performed: %d.\n", totalTasksComplete);
 	free(pWorkObjects);
 	free(pWorkObjArgsArray);
 	return 0;
