@@ -26,11 +26,46 @@ int workerDelay = DELAY_COUNT;
 BOOL traceFlag = FALSE;
 int main(int argc, LPCSTR argv[])
 {
-	
+	INT nThread, iThread;
+	PTP_WORK *pWorkObjects;
+	SRWLOCK srwl;
+	unsigned int tasksPerThread, totalTasksComplete;
+	workArg ** pWorkObjArgsArray;
+	workArg *pThreadArg;
+	TP_CALLBACK_ENVIRON cbe;  // Callback environment
+// Process Input
+	nThread = 4;
+	tasksPerThread = 6;
+	if (argc >= 4) workerDelay = 0;
+	traceFlag = true;
+
+	// Init the SRW lock 
+	InitializeSRWLock(&srwl);
+
+	pWorkObjects =(PTP_WORK*) malloc(nThread * sizeof(PTP_WORK));
+	if (pWorkObjects != NULL)
+		pWorkObjArgsArray = (workArg**)malloc(nThread * sizeof(workArg*));
+
+	if (pWorkObjects == NULL || pWorkObjArgsArray == NULL) {
+		printf("malloc Fail");
+	}
+	free(pWorkObjects);
+	free(pWorkObjArgsArray);
 	return 0;
 }
 
-VOID CALLBACK Worker(PTP_CALLBACK_INSTANCE, PVOID, PTP_WORK)
+VOID CALLBACK Worker(PTP_CALLBACK_INSTANCE Instance , PVOID Context, PTP_WORK Work)
 {
-	return VOID();
+	workArg * wArgs;
+
+	wArgs = (workArg*)Context;
+	if (traceFlag)
+		printf("Worker: %d. Thread Number: %d.\n", wArgs->objectNumber, GetCurrentThreadId());
+
+	while (wArgs->tasksComplete < wArgs->tasksToComplete) {
+		AcquireSRWLockExclusive(&(wArgs->slimRWL));
+		(wArgs->tasksComplete)++;
+		ReleaseSRWLockExclusive(&(wArgs->slimRWL));
+	}
+	return;
 }
