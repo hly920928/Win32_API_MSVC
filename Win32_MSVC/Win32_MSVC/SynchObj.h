@@ -21,8 +21,8 @@ struct QUEUE_OBJECT {
 	HANDLE	qNf;	//Event: Queue is not full			
 	DWORD qSize;	// Queue max size size		
 	DWORD qFirst;	// Index of oldest message
-	DWORD qLast;	//Index of youngest msg	*/
-	char	*msgArray;	// array of qSize messages	=
+	DWORD qLast;	//Index of youngest msg	
+	char	*msgArray;	// array of qSize messages	
 };
 // Queue management functions 
 DWORD QueueInitialize(QUEUE_OBJECT *, DWORD, DWORD);
