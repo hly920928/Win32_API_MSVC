@@ -15,4 +15,24 @@ typedef  thresholdBarrier* pThresholdBarrier;
 int CreateThresholdBarriers(pThresholdBarrier*, DWORD);
 int WaitOnThresholdBarriers(pThresholdBarrier);
 int CloseThresholdBarriers(pThresholdBarrier);
+struct QUEUE_OBJECT {
+	HANDLE	qGuard;//mutex
+	HANDLE	qNe;	// Event:Queue is not empty
+	HANDLE	qNf;	//Event: Queue is not full			
+	DWORD qSize;	// Queue max size size		
+	DWORD qFirst;	// Index of oldest message
+	DWORD qLast;	//Index of youngest msg	*/
+	char	*msgArray;	// array of qSize messages	=
+};
+// Queue management functions 
+DWORD QueueInitialize(QUEUE_OBJECT *, DWORD, DWORD);
+DWORD QueueDestroy(QUEUE_OBJECT *);
+DWORD QueueDestroyed(QUEUE_OBJECT *);
+DWORD QueueEmpty(QUEUE_OBJECT *);
+DWORD QueueFull(QUEUE_OBJECT *);
+DWORD QueueGet(QUEUE_OBJECT *, PVOID, DWORD, DWORD);
+DWORD QueuePut(QUEUE_OBJECT *, PVOID, DWORD, DWORD);
+DWORD QueueRemove(QUEUE_OBJECT *, PVOID, DWORD);
+DWORD QueueInsert(QUEUE_OBJECT *, PVOID, DWORD);
+void CALLBACK QueueShutDown(ULONG_PTR);
 

@@ -27,7 +27,7 @@ int main(int argc, LPCSTR argv[])
 	InitializeCriticalSection(&output);
 	pThresholdBarrier pbarrier;
 
-	CreateThresholdBarriers(&pbarrier, 10);
+	CreateThresholdBarriers(&pbarrier, 5);
 	
 
 	HANDLE hd[200];

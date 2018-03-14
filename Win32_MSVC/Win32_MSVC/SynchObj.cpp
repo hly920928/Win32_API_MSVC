@@ -27,12 +27,20 @@ int WaitOnThresholdBarriers(pThresholdBarrier thb)
 
 	WaitForSingleObject(thb->bGuard, INFINITE);//wait mutex
 	thb->bCount++;  //threadCount ++
-	while (thb->bCount < thb->bThreshold) {//thread too little
-		SignalObjectAndWait(thb->bGuard, thb->bEvent, INFINITE, FALSE);
-		WaitForSingleObject(thb->bGuard, INFINITE);
-	}
-	SetEvent(thb->bEvent);
 	ReleaseMutex(thb->bGuard);
+	if (thb->bCount < thb->bThreshold){ //thread too little	
+	//SignalObjectAndWait(thb->bGuard, thb->bEvent, INFINITE, FALSE);
+	//WaitForSingleObject(thb->bGuard, INFINITE);
+	WaitForSingleObject(thb->bEvent, INFINITE);
+    }else {
+		if (thb->bCount == thb->bThreshold)
+		{
+			printf("Set Event\n");
+			SetEvent(thb->bEvent);
+		}
+	}
+	int t = 666;
+	//ReleaseMutex(thb->bGuard);
 	return 0;
 }
 
