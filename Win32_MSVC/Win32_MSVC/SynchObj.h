@@ -19,7 +19,7 @@ struct QUEUE_OBJECT {
 	HANDLE	qGuard;//mutex
 	HANDLE	qNe;	// Event:Queue is not empty
 	HANDLE	qNf;	//Event: Queue is not full			
-	DWORD qSize;	// Queue max size size		
+	DWORD qSize;	// Queue max size		
 	DWORD qFirst;	// Index of oldest message
 	DWORD qLast;	//Index of youngest msg	
 	char	*msgArray;	// array of qSize messages	

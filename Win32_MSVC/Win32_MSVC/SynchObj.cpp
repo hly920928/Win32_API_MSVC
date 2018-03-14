@@ -62,11 +62,18 @@ DWORD QueueInitialize(QUEUE_OBJECT *q, DWORD mSize, DWORD nMsgs)
 	q->qGuard = CreateMutexA(NULL, FALSE, NULL);
 	q->qNe = CreateEventA(NULL, TRUE, FALSE, NULL);
 	q->qNf = CreateEventA(NULL, TRUE, FALSE, NULL);
-	return 0; /* No error */
+	return 0;
 }
 
-DWORD QueueDestroy(QUEUE_OBJECT *)
+DWORD QueueDestroy(QUEUE_OBJECT* q)
 {
+	WaitForSingleObject(q->qGuard, INFINITE);
+	free(q->msgArray);
+	q->msgArray = NULL;
+	CloseHandle(q->qNe);
+	CloseHandle(q->qNf);
+	ReleaseMutex(q->qGuard);
+	CloseHandle(q->qGuard);
 	return 0;
 }
 
@@ -75,14 +82,15 @@ DWORD QueueDestroyed(QUEUE_OBJECT *)
 	return 0;
 }
 
-DWORD QueueEmpty(QUEUE_OBJECT *)
+DWORD QueueEmpty(QUEUE_OBJECT *q)
 {
-	return 0;
+	 return (q->qFirst == q->qLast);;
 }
 
-DWORD QueueFull(QUEUE_OBJECT *)
+DWORD QueueFull(QUEUE_OBJECT * q)
 {
-	return 0;
+	return ((q->qFirst - q->qLast) == 1 ||
+		(q->qLast == q->qSize - 1 && q->qFirst == 0));
 }
 
 DWORD QueueGet(QUEUE_OBJECT *q, PVOID msg, DWORD mSize, DWORD maxWait)
@@ -103,18 +111,43 @@ DWORD QueueGet(QUEUE_OBJECT *q, PVOID msg, DWORD mSize, DWORD maxWait)
 	return 0;
 }
 
-DWORD QueuePut(QUEUE_OBJECT *, PVOID, DWORD, DWORD)
+DWORD QueuePut(QUEUE_OBJECT * q, PVOID msg, DWORD mSize, DWORD maxWait)
 {
+	WaitForSingleObject(q->qGuard, INFINITE);
+	if (q->msgArray == NULL) return 1;  // Queue has been destroyed
+	while (QueueFull(q)) {
+		SignalObjectAndWait(q->qGuard, q->qNf, INFINITE, FALSE);
+		WaitForSingleObject(q->qGuard, INFINITE);
+	}
+	// Put the message
+	QueueInsert(q, msg, mSize);
+	// Signal that the queue is not empty
+	PulseEvent(q->qNe);
+	ReleaseMutex(q->qGuard);
 	return 0;
 }
 
-DWORD QueueRemove(QUEUE_OBJECT *, PVOID, DWORD)
+DWORD QueueRemove(QUEUE_OBJECT *q, PVOID msg, DWORD mSize)
 {
+	char *pm;
+
+	if (QueueEmpty(q)) return 1;//Error 
+	pm = q->msgArray;
+	// Remove oldest 
+	memcpy(msg, pm + (q->qFirst * mSize), mSize);
+	q->qFirst = ((q->qFirst + 1) % q->qSize);
 	return 0;
 }
 
-DWORD QueueInsert(QUEUE_OBJECT *, PVOID, DWORD)
+DWORD QueueInsert(QUEUE_OBJECT *q, PVOID msg, DWORD mSize)
 {
+	char *pm;
+
+	if (QueueFull(q)) return 1;// Error 
+	pm = q->msgArray;
+	// Add a new youngest 
+	memcpy(pm + (q->qLast * mSize), msg, mSize);
+	q->qLast = ((q->qLast + 1) % q->qSize);
 	return 0;
 }
 
