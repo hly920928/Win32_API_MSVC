@@ -41,8 +41,24 @@ int main(int argc, LPCSTR argv[])
 	return 0;
 }
 
-DWORD WINAPI Producer(PVOID)
+DWORD WINAPI Producer(PVOID arg)
 {
+	THARG * parg;
+	DWORD iThread;
+	MSG_BLOCK msg;
+
+	parg = (THARG *)arg;
+	iThread = parg->threadNumber;
+
+	while (parg->workDone < parg->workGoal) {
+		Sleep(DELAY_COUNT);
+		MessageFill(&msg, iThread, iThread, parg->workDone);
+		QueuePut(&p2tq, &msg, sizeof(msg), INFINITE);
+
+		parg->workDone++;
+	}
+	MessageFill(&msg, iThread, iThread, -1);
+	QueuePut(&p2tq, &msg, sizeof(msg), INFINITE);
 	return 0;
 }
 
