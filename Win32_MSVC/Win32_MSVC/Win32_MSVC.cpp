@@ -1,57 +1,62 @@
 // Win32_MSVC.cpp : Defines the entry point for the console application.
 #include "stdafx.h"
-#include <cstdio>
 #include <ctime>
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include "Everything.h" 
-#include "myHeader_V2.h" 
-#include <string>
-#include "jobsMngmt.h";
-#include "helperFunction.h"
 #include "SynchObj.h"
-#define DELAY_COUNT 20
-#define CACHE_LINE_SIZE 64
-
+#include "messages.h"
 using namespace std;
-struct threadTestArg {
-	int id;
-	pThresholdBarrier pTb;
-	threadTestArg(int i =-1, pThresholdBarrier t=nullptr) :id(i),pTb(t) {};
-};
-CRITICAL_SECTION output;
-DWORD WINAPI threadTest(void *arg);
+#define DELAY_COUNT 1000
+#define MAX_THREADS 1024
+#define TBLOCK_SIZE 5  	//Transmitter combines
+#define TBLOCK_TIMEOUT 50 //Transmiter timeout waitin
+#define P2T_QLEN 10 	// Producer to Transmitter queue length 
+#define T2R_QLEN 4	// Transmitter to Receiver queue length 
+#define R2C_QLEN 4	//Receiver to Consumer queue length
+DWORD WINAPI Producer(PVOID);
+DWORD WINAPI Consumer(PVOID);
+DWORD WINAPI Transmitter(PVOID);
+DWORD WINAPI Receiver(PVOID);
+ struct THARG {
+	DWORD threadNumber;
+	DWORD workGoal;   
+	DWORD workDone;    
+} ;
+
+ struct T2R_MSG_OBJ {
+	DWORD numMessages; // Number of messages contained
+	MSG_BLOCK messages[TBLOCK_SIZE];
+ };
+
+ struct TR_ARG {
+	DWORD nProducers;  // Number of active producers 
+ };
+
+QUEUE_OBJECT p2tq, t2rq, *r2cqArray;
+
+static volatile DWORD ShutDown = 0;
+static DWORD EventTimeout = 50;
+DWORD trace = 0;
 int main(int argc, LPCSTR argv[])
 {
-	InitializeCriticalSection(&output);
-	pThresholdBarrier pbarrier;
-
-	CreateThresholdBarriers(&pbarrier, 5);
 	
-
-	HANDLE hd[200];
-	threadTestArg arg[20];
-	for (int i = 0; i < 10; i++) {
-		arg[i]=threadTestArg(i, pbarrier);
-		hd[i]=CreateThread(NULL,NULL, threadTest,&arg[i],NULL,NULL);
-	}	 
-	WaitForMultipleObjects(10, hd, TRUE, INFINITE);
-	//clear up
-	CloseThresholdBarriers(pbarrier);
-	DeleteCriticalSection(&output);
 	return 0;
 }
 
-DWORD WINAPI threadTest(void * arg)
+DWORD WINAPI Producer(PVOID)
 {
-	threadTestArg* argm = (threadTestArg*) arg;
-	EnterCriticalSection(&output);
-	printf("Enter Thread Id = %d\n", argm->id);
-	LeaveCriticalSection(&output);
-	WaitOnThresholdBarriers(argm->pTb);
-	EnterCriticalSection(&output);
-	printf("_Leave Thread Id = %d\n", argm->id);
-	LeaveCriticalSection(&output);
+	return 0;
+}
+
+DWORD  WINAPI Consumer(PVOID)
+{
+	return 0;
+}
+
+DWORD WINAPI Transmitter(PVOID)
+{
+	return 0;
+}
+
+DWORD WINAPI Receiver(PVOID)
+{
 	return 0;
 }

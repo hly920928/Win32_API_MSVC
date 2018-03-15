@@ -83,3 +83,5 @@ Win32_MSVC/Release/JobShell.exe
 Win32_MSVC/Win32_MSVC/2.txt
 Win32_MSVC/Win32_MSVC/Win32_MSVC.vcxproj.user
 Win32_MSVC/Win32_MSVC/Debug/win32_msvc.obj.enc
+Win32_MSVC/Win32_MSVC/messages.cpp
+Win32_MSVC/Win32_MSVC/messages.h
