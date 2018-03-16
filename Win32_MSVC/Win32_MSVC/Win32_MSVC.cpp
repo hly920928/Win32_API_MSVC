@@ -51,7 +51,7 @@ int main(int argc, LPCSTR argv[])
 	nThread = 10;
 	receiverArg.nProducers = nThread;
 	transmitterArg.nProducers = nThread;
-	goal = 250;
+	goal = 100;
 	producerThreadArray = (HANDLE*)malloc(nThread * sizeof(HANDLE));
 	producerArg = (THARG*)calloc(nThread, sizeof(THARG));
 	consumerThreadArray = (HANDLE*)malloc(nThread * sizeof(HANDLE));

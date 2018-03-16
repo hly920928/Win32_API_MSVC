@@ -15,10 +15,11 @@ typedef  thresholdBarrier* pThresholdBarrier;
 int CreateThresholdBarriers(pThresholdBarrier*, DWORD);
 int WaitOnThresholdBarriers(pThresholdBarrier);
 int CloseThresholdBarriers(pThresholdBarrier);
+//Using CONDITION VARIABLE and Slim Reader/Writer Locks
 struct QUEUE_OBJECT {
-	HANDLE	qGuard;//mutex
-	HANDLE	qNe;	// Event:Queue is not empty
-	HANDLE	qNf;	//Event: Queue is not full			
+	SRWLOCK	qGuard;//SRWLOCK
+	CONDITION_VARIABLE qNe;	// CONDITION_VARIABLE:Queue is not empty
+	CONDITION_VARIABLE	qNf;	//CONDITION_VARIABLE: Queue is not full			
 	DWORD qSize;	// Queue max size		
 	DWORD qFirst;	// Index of oldest message
 	DWORD qLast;	//Index of youngest msg	

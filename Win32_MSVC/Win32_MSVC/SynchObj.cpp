@@ -59,21 +59,18 @@ DWORD QueueInitialize(QUEUE_OBJECT *q, DWORD mSize, DWORD nMsgs)
 	if ((q->msgArray =(char*) calloc(nMsgs, mSize)) == NULL) return 1;
 	q->qFirst = q->qLast = 0;
 	q->qSize = nMsgs;
-	q->qGuard = CreateMutexA(NULL, FALSE, NULL);
-	q->qNe = CreateEventA(NULL, TRUE, FALSE, NULL);
-	q->qNf = CreateEventA(NULL, TRUE, FALSE, NULL);
+	InitializeSRWLock(&q->qGuard);
+	InitializeConditionVariable(&q->qNe);
+	InitializeConditionVariable(&q->qNf);
 	return 0;
 }
 
 DWORD QueueDestroy(QUEUE_OBJECT* q)
 {
-	WaitForSingleObject(q->qGuard, INFINITE);
+	AcquireSRWLockExclusive(&q->qGuard);
 	free(q->msgArray);
 	q->msgArray = NULL;
-	CloseHandle(q->qNe);
-	CloseHandle(q->qNf);
-	ReleaseMutex(q->qGuard);
-	CloseHandle(q->qGuard);
+	ReleaseSRWLockExclusive(&(q->qGuard));
 	return 0;
 }
 
@@ -95,35 +92,36 @@ DWORD QueueFull(QUEUE_OBJECT * q)
 
 DWORD QueueGet(QUEUE_OBJECT *q, PVOID msg, DWORD mSize, DWORD maxWait)
 {
-	WaitForSingleObject(q->qGuard, INFINITE);
+	AcquireSRWLockExclusive(&q->qGuard);
 	if (q->msgArray == NULL) return 1; // Queue destroyed 
 	while (QueueEmpty(q)) {
-		SignalObjectAndWait(q->qGuard, q->qNe, INFINITE, FALSE);
-		WaitForSingleObject(q->qGuard, INFINITE);
+		if (!SleepConditionVariableSRW(&q->qNe, &q->qGuard, INFINITE, 0)) {//release qGuard wait on qNe then Acquire qGuard
+			printf("QueueGet failed. SleepConditionVariableCS.\n");
+			return 0;
+		}
 	}
 	// remove  message
 	QueueRemove(q, msg, mSize);
 	// Signal that the queue is not full 
-	PulseEvent(q->qNf);
-	ReleaseMutex(q->qGuard);
-
-	return 0;
+	WakeConditionVariable(&q->qNf);
+	ReleaseSRWLockExclusive(&q->qGuard);
 	return 0;
 }
 
 DWORD QueuePut(QUEUE_OBJECT * q, PVOID msg, DWORD mSize, DWORD maxWait)
 {
-	WaitForSingleObject(q->qGuard, INFINITE);
+	AcquireSRWLockExclusive(&q->qGuard);
 	if (q->msgArray == NULL) return 1;  // Queue has been destroyed
 	while (QueueFull(q)) {
-		SignalObjectAndWait(q->qGuard, q->qNf, INFINITE, FALSE);
-		WaitForSingleObject(q->qGuard, INFINITE);
+		if (!SleepConditionVariableSRW(&q->qNf, &q->qGuard, INFINITE, 0))//release qGuard then wait on qNf then Acquire qGuard
+			printf("QueuePut failed. SleepConditionVariableCS.\n");
+		return 0;
 	}
 	// Put the message
 	QueueInsert(q, msg, mSize);
 	// Signal that the queue is not empty
-	PulseEvent(q->qNe);
-	ReleaseMutex(q->qGuard);
+	WakeConditionVariable(&q->qNe);
+	ReleaseSRWLockExclusive(&q->qGuard);
 	return 0;
 }
 
