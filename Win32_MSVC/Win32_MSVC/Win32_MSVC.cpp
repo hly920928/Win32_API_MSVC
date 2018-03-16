@@ -16,20 +16,21 @@ DWORD WINAPI Producer(PVOID);
 DWORD WINAPI Consumer(PVOID);
 DWORD WINAPI Transmitter(PVOID);
 DWORD WINAPI Receiver(PVOID);
- struct THARG {
+void WINAPI ShutDownReceiver(DWORD n);
+struct THARG {
 	DWORD threadNumber;
-	DWORD workGoal;   
-	DWORD workDone;    
-} ;
+	DWORD workGoal;
+	DWORD workDone;
+};
 
- struct T2R_MSG_OBJ {
+struct T2R_MSG_OBJ {
 	DWORD numMessages; // Number of messages contained
 	MSG_BLOCK messages[TBLOCK_SIZE];
- };
+};
 
- struct TR_ARG {
+struct TR_ARG {
 	DWORD nProducers;  // Number of active producers 
- };
+};
 
 QUEUE_OBJECT p2tq, t2rq, *r2cqArray;
 
@@ -38,12 +39,12 @@ static DWORD EventTimeout = 50;
 DWORD trace = 0;
 int main(int argc, LPCSTR argv[])
 {
-  //init
+	//init
 	InitializeCriticalSection(&output);
 	DWORD tStatus, nThread, iThread, goal;
-	HANDLE *producerThreadArray, 
-		*consumerThreadArray, 
-		transmitterThread, 
+	HANDLE *producerThreadArray,
+		*consumerThreadArray,
+		transmitterThread,
 		receiverThread;
 	THARG *producerArg, *consumerArg;
 	TR_ARG transmitterArg, receiverArg;
@@ -51,7 +52,7 @@ int main(int argc, LPCSTR argv[])
 	nThread = 10;
 	receiverArg.nProducers = nThread;
 	transmitterArg.nProducers = nThread;
-	goal = 100;
+	goal = 250;
 	producerThreadArray = (HANDLE*)malloc(nThread * sizeof(HANDLE));
 	producerArg = (THARG*)calloc(nThread, sizeof(THARG));
 	consumerThreadArray = (HANDLE*)malloc(nThread * sizeof(HANDLE));
@@ -78,7 +79,7 @@ int main(int argc, LPCSTR argv[])
 		consumerArg[iThread].workGoal = goal;
 		consumerArg[iThread].workDone = 0;
 
-		consumerThreadArray[iThread] =CreateThread(NULL, 0,
+		consumerThreadArray[iThread] = CreateThread(NULL, 0,
 			Consumer, &consumerArg[iThread], 0, NULL);
 		if (consumerThreadArray[iThread] == NULL) {
 			printf("Cannot create consumer thread\n");
@@ -92,7 +93,7 @@ int main(int argc, LPCSTR argv[])
 		if (producerThreadArray[iThread] == NULL) {
 			printf("Cannot create producer thread\n");
 			return 0;
-		}	
+		}
 	}
 	//init Transmitter and Receiver Thread
 	transmitterThread = CreateThread(NULL, 0, Transmitter, &transmitterArg, 0, NULL);
@@ -100,8 +101,8 @@ int main(int argc, LPCSTR argv[])
 		printf("Cannot create tranmitter thread\n");
 		return 0;
 	}
-		
-	receiverThread =CreateThread(NULL, 0, Receiver, &receiverArg, 0, NULL);
+
+	receiverThread = CreateThread(NULL, 0, Receiver, &receiverArg, 0, NULL);
 	if (receiverThread == NULL) {
 		printf("Cannot create receiver thread\n");
 		return 0;
@@ -114,7 +115,7 @@ int main(int argc, LPCSTR argv[])
 			printf("Cannot wait for consumer thread\n");
 			return 0;
 		}
-		
+
 		if (trace >= 1) {
 			printf("BOSS: consumer %d consumed %d work units\n",
 				iThread, consumerArg[iThread].workDone);
@@ -123,22 +124,24 @@ int main(int argc, LPCSTR argv[])
 	}
 	printf("BOSS: All consumers have completed their work.\n");
 	ShutDown = 1; //Set a shutdown flag.
-	//Wait transmitter and receiverThread
-	tStatus = WaitForSingleObject(transmitterThread, INFINITE);
-	if (tStatus != WAIT_OBJECT_0)
-	{
-		printf("Failed waiting for transmitter\n");
-		return 0;
-	}
-	tStatus = WaitForSingleObject(receiverThread, INFINITE);
+				  //Wait transmitter and receiverThread
+	ShutDown = 1; /* Set a shutdown flag. */
 
-	if (tStatus != WAIT_OBJECT_0) {
-		{
-			printf("Failed waiting for receiver\n");
-			return 0;
-		}
+	printf("BOSS: About to cancel transmitter.\n");
+	tStatus = QueueUserAPC(QueueShutDown, transmitterThread, 1);
+	if (tStatus == 0) {
+		printf("Failed queuing APC for transmitter\n"); return 0;
 	}
-    // clear up
+	printf("BOSS: About to cancel receiver.\n");
+	tStatus = QueueUserAPC(QueueShutDown, receiverThread, 2);
+	if (tStatus == 0) {
+		printf("Failed queuing APC for receiver\n"); return 0;
+	}
+	tStatus = QueueUserAPC(ShutDownReceiver, receiverThread, 2);
+	if (tStatus == 0) {
+		printf("Failed queuing APC for receiver\n"); return 0;
+	}
+	// clear up
 	QueueDestroy(&p2tq);
 	QueueDestroy(&t2rq);
 	for (iThread = 0; iThread < nThread; iThread++) {
@@ -191,7 +194,7 @@ DWORD  WINAPI Consumer(PVOID arg)
 	while (carg->workDone < carg->workGoal) {
 		tStatus = QueueGet(pr2cq, &msg, sizeof(msg), INFINITE);
 		if (tStatus != 0) return tStatus;
-		if (msg.sequence < 0) return 0;  
+		if (msg.sequence < 0) return 0;
 		if (trace >= 1) printf("Message received by consumer #TID: %d. Message #: %d.\n", iThread, msg.sequence);
 		if (trace >= 2) MessageDisplay(&msg);
 		carg->workDone++;
@@ -207,25 +210,34 @@ DWORD WINAPI Transmitter(PVOID arg)
 
 	while (!ShutDown) {
 		t2r_msg.numMessages = 0;
-	     // pack the messages for transmission to the receiver
+		// pack the messages for transmission to the receiver
 		for (im = 0; im < TBLOCK_SIZE; im++) {
 			//QueueGet could block
 			tStatus = QueueGet(&p2tq, &t2r_msg.messages[im], sizeof(MSG_BLOCK), INFINITE);
-			if (tStatus != 0) break;
+			if (tStatus != 0) {
+				printf("Transmitter tStatus_1 End\n");
+				return tStatus;
+			}
 			t2r_msg.numMessages++;
 			// Decrement the number of active nProducer for each negative sequence number 
+			/*
 			if (t2r_msg.messages[im].sequence < 0) {
-				tArg->nProducers--;
-				if (tArg->nProducers <= 0) break;
+			tArg->nProducers--;
+			if (tArg->nProducers <= 0) break;
 			}
+			*/
 		}
 
 		// Transmit the block of messages 	//QueueGet could block
 		tStatus = QueuePut(&t2rq, &t2r_msg, sizeof(t2r_msg), INFINITE);
-		if (tStatus != 0) return tStatus;
+		if (tStatus != 0) {
+			printf("Transmitter tStatus_2 End\n");
+			return tStatus;
+		}
 		// Terminate the transmitter if there are no active nProducers 
 		if (tArg->nProducers <= 0) return 0;
 	}
+	printf("Transmitter End\n");
 	return 0;
 }
 
@@ -238,21 +250,36 @@ DWORD WINAPI Receiver(PVOID arg)
 	while (!ShutDown) {
 		//QueueGet could block
 		tStatus = QueueGet(&t2rq, &t2r_msg, sizeof(t2r_msg), INFINITE);
-		if (tStatus != 0) return tStatus;
+		if (tStatus != 0) {
+			printf("Receiver  tStatus_1 End\n");
+			return tStatus;
+		}
 		//Distribute the messages to the proper consumer 
 		for (im = 0; im < t2r_msg.numMessages; im++) {
 			ic = t2r_msg.messages[im].destination; // Destination consumer 
-			 //QueuePut could block
+												   //QueuePut could block
 			tStatus = QueuePut(&r2cqArray[ic], &t2r_msg.messages[im], sizeof(MSG_BLOCK), INFINITE);
-			if (tStatus != 0) return tStatus;
-			if (t2r_msg.messages[im].sequence < 0) {
-				tArg->nProducers--;
-				if (tArg->nProducers <= 0) break;
+			if (tStatus != 0) {
+				printf("Receiver  tStatus_2 End\n");
+				return tStatus;
 			}
+
+			/*
+			if (t2r_msg.messages[im].sequence < 0) {
+			tArg->nProducers--;
+			if (tArg->nProducers <= 0) break;
+			}
+			*/
 		}
 		//Terminate the transmitter if there are no active nProducers
 		if (tArg->nProducers <= 0) return 0;
 	}
+	printf("Receiver End\n");
 	return 0;
 
+}
+void WINAPI ShutDownReceiver(DWORD n)
+{
+	printf("In ShutDownReceiver. %d\n", n);
+	return;
 }

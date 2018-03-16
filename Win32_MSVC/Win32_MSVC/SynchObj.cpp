@@ -28,11 +28,12 @@ int WaitOnThresholdBarriers(pThresholdBarrier thb)
 	WaitForSingleObject(thb->bGuard, INFINITE);//wait mutex
 	thb->bCount++;  //threadCount ++
 	ReleaseMutex(thb->bGuard);
-	if (thb->bCount < thb->bThreshold){ //thread too little	
-	//SignalObjectAndWait(thb->bGuard, thb->bEvent, INFINITE, FALSE);
-	//WaitForSingleObject(thb->bGuard, INFINITE);
-	WaitForSingleObject(thb->bEvent, INFINITE);
-    }else {
+	if (thb->bCount < thb->bThreshold) { //thread too little	
+										 //SignalObjectAndWait(thb->bGuard, thb->bEvent, INFINITE, FALSE);
+										 //WaitForSingleObject(thb->bGuard, INFINITE);
+		WaitForSingleObject(thb->bEvent, INFINITE);
+	}
+	else {
 		if (thb->bCount == thb->bThreshold)
 		{
 			printf("Set Event\n");
@@ -52,25 +53,30 @@ int CloseThresholdBarriers(pThresholdBarrier thb)
 	free(thb);
 	return 0;
 }
-
+//Flag 
+static BOOL shutDownGet = FALSE;
+static BOOL ShutDownPut = FALSE;
 DWORD QueueInitialize(QUEUE_OBJECT *q, DWORD mSize, DWORD nMsgs)
 {
 
-	if ((q->msgArray =(char*) calloc(nMsgs, mSize)) == NULL) return 1;
+	if ((q->msgArray = (char*)calloc(nMsgs, mSize)) == NULL) return 1;
 	q->qFirst = q->qLast = 0;
 	q->qSize = nMsgs;
-	InitializeSRWLock(&q->qGuard);
-	InitializeConditionVariable(&q->qNe);
-	InitializeConditionVariable(&q->qNf);
+	q->qGuard = CreateMutexA(NULL, FALSE, NULL);
+	q->qNe = CreateEventA(NULL, TRUE, FALSE, NULL);
+	q->qNf = CreateEventA(NULL, TRUE, FALSE, NULL);
 	return 0;
 }
 
 DWORD QueueDestroy(QUEUE_OBJECT* q)
 {
-	AcquireSRWLockExclusive(&q->qGuard);
+	WaitForSingleObject(q->qGuard, INFINITE);
 	free(q->msgArray);
 	q->msgArray = NULL;
-	ReleaseSRWLockExclusive(&(q->qGuard));
+	CloseHandle(q->qNe);
+	CloseHandle(q->qNf);
+	ReleaseMutex(q->qGuard);
+	CloseHandle(q->qGuard);
 	return 0;
 }
 
@@ -81,7 +87,7 @@ DWORD QueueDestroyed(QUEUE_OBJECT *)
 
 DWORD QueueEmpty(QUEUE_OBJECT *q)
 {
-	 return (q->qFirst == q->qLast);;
+	return (q->qFirst == q->qLast);;
 }
 
 DWORD QueueFull(QUEUE_OBJECT * q)
@@ -92,37 +98,44 @@ DWORD QueueFull(QUEUE_OBJECT * q)
 
 DWORD QueueGet(QUEUE_OBJECT *q, PVOID msg, DWORD mSize, DWORD maxWait)
 {
-	AcquireSRWLockExclusive(&q->qGuard);
+	WaitForSingleObject(q->qGuard, INFINITE);
 	if (q->msgArray == NULL) return 1; // Queue destroyed 
-	while (QueueEmpty(q)) {
-		if (!SleepConditionVariableSRW(&q->qNe, &q->qGuard, INFINITE, 0)) {//release qGuard wait on qNe then Acquire qGuard
-			printf("QueueGet failed. SleepConditionVariableCS.\n");
-			return 0;
+	while (!shutDownGet && QueueEmpty(q)) {
+		if (SignalObjectAndWait(q->qGuard, q->qNe, INFINITE, TRUE) == WAIT_IO_COMPLETION
+			&& shutDownGet) {
+			continue;
 		}
+		WaitForSingleObject(q->qGuard, INFINITE);
 	}
 	// remove  message
-	QueueRemove(q, msg, mSize);
-	// Signal that the queue is not full 
-	WakeConditionVariable(&q->qNf);
-	ReleaseSRWLockExclusive(&q->qGuard);
-	return 0;
+	if (!shutDownGet) {
+		QueueRemove(q, msg, mSize);
+		// Signal that the queue is not full 
+		PulseEvent(q->qNf);
+		ReleaseMutex(q->qGuard);
+	}
+	return shutDownGet ? WAIT_TIMEOUT : 0;
 }
 
 DWORD QueuePut(QUEUE_OBJECT * q, PVOID msg, DWORD mSize, DWORD maxWait)
 {
-	AcquireSRWLockExclusive(&q->qGuard);
+	WaitForSingleObject(q->qGuard, INFINITE);
 	if (q->msgArray == NULL) return 1;  // Queue has been destroyed
-	while (QueueFull(q)) {
-		if (!SleepConditionVariableSRW(&q->qNf, &q->qGuard, INFINITE, 0))//release qGuard then wait on qNf then Acquire qGuard
-			printf("QueuePut failed. SleepConditionVariableCS.\n");
-		return 0;
+	while (!ShutDownPut && QueueFull(q)) {
+		if (SignalObjectAndWait(q->qGuard, q->qNf, INFINITE, TRUE) == WAIT_IO_COMPLETION
+			&& ShutDownPut) {
+			continue;
+		}
+		WaitForSingleObject(q->qGuard, INFINITE);
 	}
 	// Put the message
-	QueueInsert(q, msg, mSize);
-	// Signal that the queue is not empty
-	WakeConditionVariable(&q->qNe);
-	ReleaseSRWLockExclusive(&q->qGuard);
-	return 0;
+	if (!ShutDownPut) {
+		QueueInsert(q, msg, mSize);
+		// Signal that the queue is not empty
+		PulseEvent(q->qNe);
+		ReleaseMutex(q->qGuard);
+	}
+	return ShutDownPut ? WAIT_TIMEOUT : 0;
 }
 
 DWORD QueueRemove(QUEUE_OBJECT *q, PVOID msg, DWORD mSize)
@@ -149,6 +162,12 @@ DWORD QueueInsert(QUEUE_OBJECT *q, PVOID msg, DWORD mSize)
 	return 0;
 }
 
-void CALLBACK QueueShutDown(ULONG_PTR)
+void CALLBACK QueueShutDown(ULONG_PTR pn)
 {
+	DWORD n = (DWORD)pn;
+	printf("In ShutDownQueue callback. %d\n", n);
+	if (n % 2 != 0) shutDownGet = TRUE;
+	if ((n / 2) % 2 != 0) ShutDownPut = TRUE;
+	// clear up
+	return;
 }
