@@ -2,33 +2,25 @@
 #include "stdafx.h"
 #include <ctime>
 #include "SynchObj.h"
+#include <iostream>
+#include <string>
 #include "messages.h"
 using namespace std;
 int main(int argc, LPCSTR argv[])
 {
-	HANDLE hWrite = GetStdHandle(STD_OUTPUT_HANDLE);
-	if (argc < 3){
-		printf("Input Error\n");
-		return 0;
-	}
-	printf("In RandInt\n");
-	int num = atoi(argv[1]);
-	int inval = atoi(argv[2]);
-	srand((int)time(NULL));
+	HANDLE hRead = GetStdHandle(STD_INPUT_HANDLE);
+	printf("In ReadP\n");
 	char buffer[6];
-	for (int i = 0; i < num; i++) {
-		Sleep(inval);
-		int n = rand() % 10000;
-		printf("In RandInt : %d\n", n);
-		itoa(n, buffer,10);
-		buffer[5] = '\n';
-		WriteFile(hWrite, &buffer, sizeof(buffer), NULL, NULL);
+	string s;
+	DWORD n_read = 0;
+	while (true) {
+		ReadFile(hRead, buffer, 6, &n_read, NULL);
+		buffer[5] = '\0';
+		s= buffer;
+		if (buffer[0] == '-')break;
+		cout << "In ReadP : " << s << endl;
 	}
-	char buffer_2[3];
-	itoa(-1, buffer_2, 10);
-	buffer[2] = '\n';
-	WriteFile(hWrite, &buffer_2, sizeof(buffer_2), NULL, NULL);
-	printf("In RandInt END\n");
+	printf("In ReadP END\n");
 	return 0;
 }
 
