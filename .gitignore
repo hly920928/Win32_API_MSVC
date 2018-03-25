@@ -87,3 +87,4 @@ Win32_MSVC/Win32_MSVC/messages.cpp
 Win32_MSVC/Win32_MSVC/messages.h
 Win32_MSVC/Win32_MSVC/ReadP.exe
 Win32_MSVC/Win32_MSVC/ReadP_0.exe
+Win32_MSVC/Win32_MSVC/LocateServer.cpp
