@@ -47,6 +47,6 @@ struct RESPONSE {
 #define CS_REPORT		4
 #define CS_TERMTHD		5
 
- BOOL LocateServer(LPTSTR, DWORD);
+ BOOL LocateServer(LPSTR, DWORD);
 
 #define SERVER_PORT 50000 

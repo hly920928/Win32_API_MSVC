@@ -5,57 +5,76 @@
 #include <iostream>
 #include <string>
 #include "messages.h"
+#include  "ClientServer.h"
 using namespace std;
-void randStr(char* buffer) {
-	for (int i = 0; i < 5; i++) {
-		buffer[i] = 'a'+rand() % 26;
-	}
-	buffer[5] = '\n';
-}
+
 int main(int argc, LPCSTR argv[])
 {
-	SECURITY_ATTRIBUTES pipeSA = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-	PROCESS_INFORMATION procInfo1, procInfo2;
-	STARTUPINFOA startInfoCh1, startInfoCh2;
-	GetStartupInfoA(&startInfoCh1);
-	GetStartupInfoA(&startInfoCh2);
-	HANDLE hReadPipe, hWritePipe;
-	if (!CreatePipe(&hReadPipe, &hWritePipe, &pipeSA, 0)) {
-		printf("Pipe Create Fail\n");
-		return 0;
+	HANDLE hNamedPipe = INVALID_HANDLE_VALUE;
+	CHAR quitMsg[] = "$Quit";
+	CHAR serverPipeName[MAX_PATH + 1];
+	REQUEST request;		
+	RESPONSE response;	
+	DWORD nRead, nWrite, npMode = PIPE_READMODE_MESSAGE | PIPE_WAIT;
+	string str;
+	/*
+	while (true) {
+		//processing Input
+		printf("Enter Command: ");
+		cin >> str;
+		string t;
+		while (true) {
+			cin >> t;
+			if (t == "END")break;
+			str = str +" " +t;
+		}
+		if (!strcmp(str.data(), quitMsg))return 0;
+		copy(str.data(), str.data() + str.size(), request.record);
+		request.record[str.size()] = '\0';
+		//printf("%s\n", (char*)request.record);
 	}
-	//Process 1
-	startInfoCh1.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-	startInfoCh1.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-	startInfoCh1.hStdOutput = hWritePipe;
-	startInfoCh1.dwFlags = STARTF_USESTDHANDLES;
-	if (!CreateProcessA(NULL, "ReadP_0", NULL, NULL,
-		TRUE,			/* Inherit handles. */
-		0, NULL, NULL, &startInfoCh1, &procInfo1)) {
-		printf("Process 1 Create Fail\n");
-		return 0;
-	}
-	CloseHandle(procInfo1.hThread);
-	CloseHandle(hWritePipe);
+	*/
+	LocateServer(serverPipeName, MAX_PATH);
 
-	//Process 2
-	startInfoCh2.hStdInput = hReadPipe;
-	startInfoCh2.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-	startInfoCh2.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-	startInfoCh2.dwFlags = STARTF_USESTDHANDLES;
-	if (!CreateProcessA(NULL, "ReadP", NULL, NULL,
-		TRUE,			/* Inherit handles. */
-		0, NULL, NULL, &startInfoCh2, &procInfo2)) {
-		printf("Process 2 Create Fail\n");
-		return 0;
+	while (INVALID_HANDLE_VALUE == hNamedPipe) { 
+		if (!WaitNamedPipeA(serverPipeName, NMPWAIT_WAIT_FOREVER))
+		{
+			printf("WaitNamedPipe error.\n");	return 0;
+		}
+		hNamedPipe = CreateFileA(serverPipeName, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	}
-	CloseHandle(procInfo2.hThread);
-	CloseHandle(hReadPipe);
 
-	WaitForSingleObject(procInfo1.hProcess, INFINITE);
-	WaitForSingleObject(procInfo2.hProcess, INFINITE);
-	CloseHandle(procInfo1.hProcess);
-	CloseHandle(procInfo2.hProcess);
+	if (!SetNamedPipeHandleState(hNamedPipe, &npMode, NULL, NULL))
+	{
+		printf("SetNamedPipeHandleState error.\n");	return 0;
+	}
+	request.rqLen = RQ_SIZE;
+
+	while (true){
+		//processing Input
+		printf("Enter Command: ");
+		cin >> str;
+		string t;
+		while (true) {
+			cin >> t;
+			if (t == "END")break;
+			str = str + " " + t;
+		}
+		if (!strcmp(str.data(), quitMsg))return 0;
+		copy(str.data(), str.data() + str.size(), request.record);
+		request.record[str.size()] = '\0';
+		//printf("%s\n", (char*)request.record);
+		if (!WriteFile(hNamedPipe, &request, RQ_SIZE, &nWrite, NULL)) {
+			printf("Write NP failed.\n");	return 0;
+		}
+	
+		while (ReadFile(hNamedPipe, &response, RS_SIZE, &nRead, NULL))
+		{
+			if (response.rsLen <= 1) {break; }
+			printf("%s\n", response.record);
+		}
+	}
 	return 0;
 };
 
