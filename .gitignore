@@ -85,8 +85,14 @@ Win32_MSVC/Win32_MSVC/Win32_MSVC.vcxproj.user
 Win32_MSVC/Win32_MSVC/Debug/win32_msvc.obj.enc
 Win32_MSVC/Win32_MSVC/messages.cpp
 Win32_MSVC/Win32_MSVC/messages.h
+<<<<<<< HEAD
 Win32_MSVC/Win32_MSVC/ReadP.exe
 Win32_MSVC/Win32_MSVC/ReadP_0.exe
 Win32_MSVC/Win32_MSVC/LocateServer.cpp
 Win32_MSVC/Win32_MSVC/SrvrBcst.exe
 Win32_MSVC/Win32_MSVC/Client.exe
+=======
+Win32_MSVC/Win32_MSVC/Client.exe
+Win32_MSVC/Win32_MSVC/LocateServer.cpp
+Win32_MSVC/Win32_MSVC/SrvrBcst.exe
+>>>>>>> master
