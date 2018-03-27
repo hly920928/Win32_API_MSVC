@@ -13,7 +13,7 @@ using namespace std;
 	TCHAR tempFileName[MAX_PATH];
  };
  typedef THREAD_ARG *LPTHREAD_ARG;
- volatile static int shutDown = 0;
+ volatile static unsigned int shutDown = 0;
  static DWORD WINAPI Server(LPTHREAD_ARG);
  static DWORD WINAPI Connect(LPTHREAD_ARG);
  static DWORD WINAPI ServerBroadcast(LPLONG);
@@ -41,7 +41,9 @@ DWORD WINAPI ServerBroadcast(LPLONG)
 	return 0;
 }
 
-BOOL WINAPI Handler(DWORD)
+BOOL WINAPI Handler(DWORD CtrlEvent)
 {
-	return 0;
+	printf("In console control handler\n");
+	InterlockedIncrement(&shutDown);
+	return TRUE;
 }
