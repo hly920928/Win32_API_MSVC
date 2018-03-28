@@ -23,6 +23,59 @@ using namespace std;
 int main(int argc, LPCSTR argv[])
 {
 	
+
+	HANDLE hNp, hMonitor, hSrvrThread[MAX_CLIENTS];
+	DWORD iNp, monitorId, threadId;
+	DWORD AceMasks[] =
+	{ STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0X1FF, 0, 0 };
+	LPSECURITY_ATTRIBUTES pNPSA = NULL;
+
+	if (!SetConsoleCtrlHandler(Handler, TRUE)) {
+		printf("Cannot create Ctrl handler/n");
+		return 0;
+	}
+
+	hMonitor = (HANDLE)_beginthreadex(NULL, 0, (_beginthreadex_proc_type)ServerBroadcast, NULL, 0, (unsigned int*)&monitorId);
+
+	/*	Create a pipe instance for every server thread.
+	*	Create a temp file name for each thread.
+	*	Create a thread to service that pipe. */
+
+	for (iNp = 0; iNp < MAX_CLIENTS; iNp++) {
+		hNp = CreateNamedPipeA(SERVER_PIPE, PIPE_ACCESS_DUPLEX,
+			PIPE_READMODE_MESSAGE | PIPE_TYPE_MESSAGE | PIPE_WAIT,
+			MAX_CLIENTS, 0, 0, INFINITE, pNPSA);
+
+		if (hNp == INVALID_HANDLE_VALUE)
+		{
+			printf("Failure to open named pipe.\n");	return 0;
+		}
+		threadArgs[iNp].hNamedPipe = hNp;
+		threadArgs[iNp].threadNumber = iNp;
+		GetTempFileNameA(".", "CLP", 0, threadArgs[iNp].tempFileName);
+		hSrvrThread[iNp] = (HANDLE)_beginthreadex(NULL, 0, (_beginthreadex_proc_type)Server,
+			&threadArgs[iNp], 0, (unsigned int*)&threadId);
+		if (hSrvrThread[iNp] == NULL) {
+			printf("Failure to create server thread.\n");	return 0;
+		}
+	}
+
+	// Wait 
+	printf("On Waiting All Server worker threads have shut down.\n");
+	WaitForMultipleObjects(MAX_CLIENTS, hSrvrThread, TRUE, INFINITE);
+    printf("All Server worker threads have shut down.\n");
+
+	WaitForSingleObject(hMonitor, INFINITE);
+	printf("Monitor thread has shut down.\n");
+	//clean up
+	CloseHandle(hMonitor);
+	for (iNp = 0; iNp < MAX_CLIENTS; iNp++) {
+		
+		CloseHandle(hSrvrThread[iNp]);
+		DeleteFileA(threadArgs[iNp].tempFileName);
+	}
+
+	printf("Server process will exit.\n");
 	return 0;
 };
 

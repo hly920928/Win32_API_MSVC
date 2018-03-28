@@ -96,3 +96,4 @@ Win32_MSVC/Win32_MSVC/Client.exe
 Win32_MSVC/Win32_MSVC/LocateServer.cpp
 Win32_MSVC/Win32_MSVC/SrvrBcst.exe
 >>>>>>> master
+*.tmp
