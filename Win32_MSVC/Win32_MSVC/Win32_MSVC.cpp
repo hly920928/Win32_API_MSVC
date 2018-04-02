@@ -6,6 +6,7 @@
 #include <string>
 #include "messages.h"
 #include  "ClientServer.h"
+#define myMS "\\\\.\\MAILSLOT\\temp_test_MailSlot"
 using namespace std;
  struct THREAD_ARG {			
 	HANDLE hNamedPipe;		
@@ -22,71 +23,24 @@ using namespace std;
  static THREAD_ARG threadArgs[MAX_CLIENTS];
 int main(int argc, LPCSTR argv[])
 {
-	HANDLE hNamedPipe = INVALID_HANDLE_VALUE;
-	CHAR quitMsg[] = "$Quit";
-	CHAR serverPipeName[MAX_PATH + 1];
-	REQUEST request;
-	RESPONSE response;
-	DWORD nRead, nWrite, npMode = PIPE_READMODE_MESSAGE | PIPE_WAIT;
-	string str;
-	/*
+	HANDLE hMailSlot;
 	while (true) {
-	//processing Input
-	printf("Enter Command: ");
-	cin >> str;
-	string t;
-	while (true) {
-	cin >> t;
-	if (t == "END")break;
-	str = str +" " +t;
-	}
-	if (!strcmp(str.data(), quitMsg))return 0;
-	copy(str.data(), str.data() + str.size(), request.record);
-	request.record[str.size()] = '\0';
-	//printf("%s\n", (char*)request.record);
-	}
-	*/
-	LocateServer(serverPipeName, MAX_PATH);
-
-	while (INVALID_HANDLE_VALUE == hNamedPipe) {
-		if (!WaitNamedPipeA(serverPipeName, NMPWAIT_WAIT_FOREVER))
-		{
-			printf("WaitNamedPipe error.\n");	return 0;
-		}
-		hNamedPipe = CreateFileA(serverPipeName, GENERIC_READ | GENERIC_WRITE, 0, NULL,
-			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	}
-
-	if (!SetNamedPipeHandleState(hNamedPipe, &npMode, NULL, NULL))
-	{
-		printf("SetNamedPipeHandleState error.\n");	return 0;
-	}
-	request.rqLen = RQ_SIZE;
-
-	while (true) {
-		//processing Input
-		printf("Enter Command_End with END: ");
-		cin >> str;
-		string t;
 		while (true) {
-			cin >> t;
-			if (t == "END")break;
-			str = str + " " + t;
+			hMailSlot = CreateFileA(myMS, GENERIC_WRITE | GENERIC_READ,
+				FILE_SHARE_READ | FILE_SHARE_WRITE,
+				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+			if (hMailSlot == INVALID_HANDLE_VALUE) {
+				printf("Wait On Mailslot\n");
+				Sleep(2500);
+			}else break;
 		}
-		if (!strcmp(str.data(), quitMsg))return 0;
-		copy(str.data(), str.data() + str.size(), request.record);
-		request.record[str.size()] = '\0';
-		//printf("%s\n", (char*)request.record);
-		if (!WriteFile(hNamedPipe, &request, RQ_SIZE, &nWrite, NULL)) {
-			printf("Write NP failed.\n");	return 0;
+		int rd = rand();
+		printf("Random Generate %d\n",rd);
+		if (!WriteFile(hMailSlot, &rd, sizeof(rd), NULL, NULL)) {
+			printf("MailSlot Write error.\n"); return 0;
 		}
-
-		while (ReadFile(hNamedPipe, &response, RS_SIZE, &nRead, NULL))
-		{
-			if (response.rsLen <= 1) { break; }
-			printf("Response is:\n");
-			printf("%s\n", response.record);
-		}
+		CloseHandle(hMailSlot);
+		Sleep(2500);
 	}
 	return 0;
 };
