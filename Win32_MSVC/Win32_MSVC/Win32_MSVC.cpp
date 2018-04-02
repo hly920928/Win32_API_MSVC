@@ -24,34 +24,20 @@ using namespace std;
 int main(int argc, LPCSTR argv[])
 {
 	HANDLE hMailSlot;
-	srand(time(NULL));
-	while (true) {
-		while (true) {
-			hMailSlot = CreateFileA(myMS, GENERIC_WRITE | GENERIC_READ,
-				FILE_SHARE_READ | FILE_SHARE_WRITE,
-				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-			if (hMailSlot == INVALID_HANDLE_VALUE) {
-				printf("Wait On Mailslot\n");
-				Sleep(1000);
-			}
-			else break;
-		}
-		DWORD read = 0;
-		char t[8];
-		itoa(rand() ,t,7);
-		t[7] = '\0';
-		printf("Random Generate %s\n", t);
-		if (!WriteFile(hMailSlot, t, sizeof(t), &read, NULL)) {
-			printf("MailSlot Write error.\n"); return 0;
-		}
-		else {
-			printf("MailSlot Write Succ.\n");
-			break;
-		}
-		CloseHandle(hMailSlot);
-		Sleep(1000);
+	hMailSlot = CreateMailslotA(myMS, 0, MAILSLOT_WAIT_FOREVER, NULL);
+	if (hMailSlot == INVALID_HANDLE_VALUE) {
+		printf("MS create error.\n"); return 0;
 	}
-	printf("BoardCast END\n");
+	DWORD val = 0;
+	char t[8];
+	printf("Receiver Wait on Mailslot\n");
+	if (ReadFile(hMailSlot, t, sizeof(t), &val, NULL)) {
+		printf("Receive %s\n", t);
+		printf("Wait on Mailslot\n", val);
+	}
+	else {
+		printf("TimeOut Receiver END\n");
+	}
 	CloseHandle(hMailSlot);
 	return 0;
 };
