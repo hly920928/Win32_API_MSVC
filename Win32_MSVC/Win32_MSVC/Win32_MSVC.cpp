@@ -24,6 +24,7 @@ using namespace std;
 int main(int argc, LPCSTR argv[])
 {
 	HANDLE hMailSlot;
+	srand(time(NULL));
 	while (true) {
 		while (true) {
 			hMailSlot = CreateFileA(myMS, GENERIC_WRITE | GENERIC_READ,
