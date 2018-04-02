@@ -32,17 +32,27 @@ int main(int argc, LPCSTR argv[])
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (hMailSlot == INVALID_HANDLE_VALUE) {
 				printf("Wait On Mailslot\n");
-				Sleep(2500);
-			}else break;
+				Sleep(1000);
+			}
+			else break;
 		}
-		int rd = rand();
-		printf("Random Generate %d\n",rd);
-		if (!WriteFile(hMailSlot, &rd, sizeof(rd), NULL, NULL)) {
+		DWORD read = 0;
+		char t[8];
+		itoa(rand() ,t,7);
+		t[7] = '\0';
+		printf("Random Generate %s\n", t);
+		if (!WriteFile(hMailSlot, t, sizeof(t), &read, NULL)) {
 			printf("MailSlot Write error.\n"); return 0;
 		}
+		else {
+			printf("MailSlot Write Succ.\n");
+			break;
+		}
 		CloseHandle(hMailSlot);
-		Sleep(2500);
+		Sleep(1000);
 	}
+	printf("BoardCast END\n");
+	CloseHandle(hMailSlot);
 	return 0;
 };
 
