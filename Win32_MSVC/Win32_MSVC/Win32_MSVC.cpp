@@ -15,9 +15,36 @@ int main(int argc, LPCSTR argv[])
 	return 0;
 };
 
-BOOL SendRequestMessage(REQUEST *, SOCKET)
+BOOL SendRequestMessage(REQUEST * pRequest, SOCKET sd)
 {
-	return 0;
+	BOOL disconnect = FALSE;
+	LONG32 nRemainSend, nXfer;
+	char* pBuffer;
+
+	//request header
+	nRemainSend = RQ_HEADER_LEN;
+	pRequest->rqLen = (DWORD)(strlen((char*)pRequest->record) + 1);
+	pBuffer = (char*)pRequest;
+	while (nRemainSend > 0 && !disconnect) {
+		//send does not guarantee that the entire message is sent
+		nXfer = send(sd, pBuffer, nRemainSend, 0);
+		if (nXfer == SOCKET_ERROR){
+			printf("client send() failed\n"); return 0;
+		}
+		disconnect = (nXfer == 0);
+		nRemainSend -= nXfer; pBuffer += nXfer;
+	}
+	//request record 
+	nRemainSend = pRequest->rqLen;
+	pBuffer = (char*)pRequest->record;
+	while (nRemainSend > 0 && !disconnect) {
+		nXfer = send(sd, pBuffer, nRemainSend, 0);
+		if (nXfer == SOCKET_ERROR) 
+		{printf("client send() failed\n"); return 0;}
+		disconnect = (nXfer == 0);
+		nRemainSend -= nXfer; pBuffer += nXfer;
+	}
+	return disconnect;
 }
 
 BOOL ReceiveResponseMessage(RESPONSE *pResponse, SOCKET sd)
@@ -25,9 +52,8 @@ BOOL ReceiveResponseMessage(RESPONSE *pResponse, SOCKET sd)
 	BOOL disconnect = FALSE, LastRecord = FALSE;
 	LONG32 nRemainRecv, nXfer;
 	char* pBuffer;
-
+	// Read the header 
 	while (!LastRecord) {
-		// Read the header 
 		nRemainRecv = RS_HEADER_LEN; pBuffer =(char*)pResponse;
 		while (nRemainRecv > 0 && !disconnect) {
 			nXfer = recv(sd, pBuffer, nRemainRecv, 0);
@@ -35,10 +61,11 @@ BOOL ReceiveResponseMessage(RESPONSE *pResponse, SOCKET sd)
 				printf("client response recv() failed\n"); return 0;
 			}
 			disconnect = (nXfer == 0);
+			//Receive until read All
 			nRemainRecv -= nXfer; pBuffer += nXfer;
 		}
 		//finish reading pResponse->rsLen
-		//	Read the response record 
+		//	Read the  record 
 		nRemainRecv = pResponse->rsLen;
 		// Exclude buffer overflow 
 		nRemainRecv = min(nRemainRecv, MAX_RQRS_LEN);
