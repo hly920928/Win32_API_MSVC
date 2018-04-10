@@ -3,66 +3,32 @@
 #include "Everything.h"
 #include "ClientServer.h"	
 #pragma comment(lib, "Ws2_32.lib")
+
+struct sockaddr_in srvSAddr;	
+struct sockaddr_in connectSAddr;	
+WSADATA WSStartData;
 static BOOL SendRequestMessage(REQUEST *, SOCKET);
 static BOOL ReceiveResponseMessage(RESPONSE *, SOCKET);
-struct sockaddr_in clientSAddr;
+enum SERVER_THREAD_STATE {
+	SERVER_SLOT_FREE, SERVER_THREAD_STOPPED,
+	SERVER_THREAD_RUNNING, SERVER_SLOT_INVALID
+};
+ struct SERVER_ARG {
+	CRITICAL_SECTION threadCs;
+	DWORD	number;
+	SOCKET	sock;
+	enum SERVER_THREAD_STATE thState;
+	HANDLE	hSrvThread;
+	HINSTANCE	hDll;
+ };
+ static DWORD WINAPI Server(PVOID);
+ static DWORD WINAPI AcceptThread(PVOID);
+ static BOOL  WINAPI Handler(DWORD);
+
+ volatile static unsigned int shutFlag = 0;
+ static SOCKET SrvSock = INVALID_SOCKET, connectSock = INVALID_SOCKET;
 int main(int argc, LPCSTR argv[])
 {
-	SOCKET clientSock = INVALID_SOCKET;
-	REQUEST request;	
-	RESPONSE response;	
-	WSADATA WSStartData;				
-	BOOL quit = FALSE;
-	DWORD conVal;
-
-	if (WSAStartup(MAKEWORD(2, 0), &WSStartData) != 0) {
-		printf("Cannot support sockets\n"); return 0;
-	}
-	clientSock = socket(AF_INET, SOCK_STREAM, 0);
-	if (clientSock == INVALID_SOCKET) {
-		printf("Failed client socket() call\n"); return 0;
-	}
-	memset(&clientSAddr, 0, sizeof(clientSAddr));
-	clientSAddr.sin_family = AF_INET;
-	
-	clientSAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-	if (argc < 2) {
-		printf("Port is %d\n", SERVER_PORT); 
-		clientSAddr.sin_port = htons(SERVER_PORT);
-	}
-	else {
-		int port = atoi(argv[1]);
-		printf("Port is %d\n", port);
-		clientSAddr.sin_port = htons(port);
-	}
-	printf("Waiting connecting\n"); 
-	conVal = connect(clientSock, (struct sockaddr *)&clientSAddr, sizeof(clientSAddr));
-	if (conVal == SOCKET_ERROR) {
-		printf("Failed client connect() call\n"); return 0;
-	} 
-
-	/*  Main loop to prompt user, send request, receive response */
-	while (!quit) {
-		printf("Enter Command: \n");
-		fgets((char*)request.record, MAX_RQRS_LEN - 1, stdin);
-		/* Get rid of the new line at the end */
-		/* Messages use 8-bit characters */
-		request.record[strlen((char*)request.record) - 1] = '\0';
-		if (strcmp((char*)request.record, "$Quit") == 0) quit = TRUE;
-		printf("Sending Request Message\n");
-		SendRequestMessage(&request, clientSock);
-		printf("Waiting ReceiveResponseMessage\n");
-		if (!quit) ReceiveResponseMessage(&response, clientSock);
-	}
-
-	//clear up
-	shutdown(clientSock, SD_BOTH); 
-
-	closesocket(clientSock);
-	WSACleanup();
-
-	printf("****Leaving client\n");
 	return 0;
 };
 
@@ -135,4 +101,44 @@ static BOOL ReceiveResponseMessage(RESPONSE *pResponse, SOCKET sd)
 			printf("%s\n", pResponse->record);
 	}
 	return disconnect;
+}
+
+DWORD WINAPI Server(PVOID)
+{
+	return 0;
+}
+
+DWORD WINAPI AcceptThread(PVOID pArg)
+{
+	LONG addrLen;
+	SERVER_ARG * pThArg = (SERVER_ARG *)pArg;
+
+	addrLen = sizeof(connectSAddr);
+	pThArg->sock =
+		accept(SrvSock, (struct sockaddr *)&connectSAddr, (int*)&addrLen);
+	if (pThArg->sock == INVALID_SOCKET) {
+		printf("accept: invalid socket error\n");
+		return 1;
+	}
+	EnterCriticalSection(&(pThArg->threadCs));
+	__try {
+		pThArg->hSrvThread = (HANDLE)_beginthreadex(NULL, 0, (_beginthreadex_proc_type)Server, pThArg, 0, NULL);
+		if (pThArg->hSrvThread == NULL) {
+			printf("Failed creating server thread\n");
+			return 1;
+		}
+		pThArg->thState = SERVER_THREAD_RUNNING;
+		printf("Client accepted on slot: %d, using server thread %d.\n", pThArg->number, GetThreadId(pThArg->hSrvThread));
+	}
+	__finally { LeaveCriticalSection(&(pThArg->threadCs)); }
+	return 0;
+}
+
+BOOL WINAPI Handler(DWORD CtrlEvent)
+{
+
+	printf("In console control handler\n");
+	InterlockedIncrement(&shutFlag);
+	return TRUE;
+	return 0;
 }
