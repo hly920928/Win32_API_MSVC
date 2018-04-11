@@ -9,6 +9,8 @@ struct sockaddr_in connectSAddr;
 WSADATA WSStartData;
 static BOOL SendRequestMessage(REQUEST *, SOCKET);
 static BOOL ReceiveResponseMessage(RESPONSE *, SOCKET);
+static BOOL ReceiveRequestMessage(REQUEST *pRequest, SOCKET);
+static BOOL SendResponseMessage(RESPONSE *pResponse, SOCKET);
 enum SERVER_THREAD_STATE {
 	SERVER_SLOT_FREE, SERVER_THREAD_STOPPED,
 	SERVER_THREAD_RUNNING, SERVER_SLOT_INVALID
@@ -103,9 +105,191 @@ static BOOL ReceiveResponseMessage(RESPONSE *pResponse, SOCKET sd)
 	return disconnect;
 }
 
-DWORD WINAPI Server(PVOID)
+BOOL ReceiveRequestMessage(REQUEST * pRequest, SOCKET sd)
 {
-	return 0;
+	BOOL disconnect = FALSE;
+	LONG32 nRemainRecv = 0, nXfer;
+	LPBYTE pBuffer;
+
+	//Read header
+	nRemainRecv = RQ_HEADER_LEN;
+	pBuffer = (LPBYTE)pRequest;
+
+	while (nRemainRecv > 0 && !disconnect) {
+		nXfer = recv(sd,(char*) pBuffer, nRemainRecv, 0);
+		if (nXfer == SOCKET_ERROR) {
+			printf("server request recv() failed\n"); return 0;
+		}
+		disconnect = (nXfer == 0);
+		nRemainRecv -= nXfer; pBuffer += nXfer;
+	}
+
+	//Read headerrecord 
+	nRemainRecv = pRequest->rqLen;
+
+	nRemainRecv = min(nRemainRecv, MAX_RQRS_LEN);
+
+	pBuffer = (LPBYTE)pRequest->record;
+	while (nRemainRecv > 0 && !disconnect) {
+		nXfer = recv(sd, (char*)pBuffer, nRemainRecv, 0);
+		if (nXfer == SOCKET_ERROR) {
+			printf("server request recv() failed\n"); return 0;
+		}
+		disconnect = (nXfer == 0);
+		nRemainRecv -= nXfer; pBuffer += nXfer;
+	}
+
+	return disconnect;
+}
+
+BOOL SendResponseMessage(RESPONSE *pResponse, SOCKET sd)
+{
+	BOOL disconnect = FALSE;
+	LONG32 nRemainRecv = 0, nXfer, nRemainSend;
+	LPBYTE pBuffer;
+
+// send header 
+	nRemainSend = RS_HEADER_LEN;
+	pResponse->rsLen = (long)(strlen((char*)pResponse->record) + 1);
+	pBuffer = (LPBYTE)pResponse;
+	while (nRemainSend > 0 && !disconnect) {
+		nXfer = send(sd, (char*)pBuffer, nRemainSend, 0);
+		if (nXfer == SOCKET_ERROR) {
+			printf("server send() failed\n"); return 0;
+		}
+		disconnect = (nXfer == 0);
+		nRemainSend -= nXfer; pBuffer += nXfer;
+	}
+	// send remain 
+	nRemainSend = pResponse->rsLen;
+	pBuffer = (LPBYTE)pResponse->record;
+	while (nRemainSend > 0 && !disconnect) {
+		nXfer = send(sd, (char*)pBuffer, nRemainSend, 0);
+		if (nXfer == SOCKET_ERROR) {
+			printf("server send() failed\n"); return 0;
+		}
+		disconnect = (nXfer == 0);
+		nRemainSend -= nXfer; pBuffer += nXfer;
+	}
+	return disconnect;
+}
+
+DWORD WINAPI Server(PVOID pArg)
+{
+	BOOL done = FALSE;
+	STARTUPINFOA startInfoCh;
+	SECURITY_ATTRIBUTES tempSA = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+	PROCESS_INFORMATION procInfo;
+	SOCKET connectSock;
+	int commandLen;
+	REQUEST request;	
+	RESPONSE response;
+	char sysCommand[MAX_RQRS_LEN];
+	CHAR tempFile[100];
+	HANDLE hTmpFile;
+	FILE *fp = NULL;
+	int(__cdecl *dl_addr)(char *, char *);
+	SERVER_ARG * pThArg = (SERVER_ARG *)pArg;
+	enum SERVER_THREAD_STATE threadState;
+
+	GetStartupInfoA(&startInfoCh);
+
+	connectSock = pThArg->sock;
+	//Create a temp file name 
+	tempFile[sizeof(tempFile) / sizeof(CHAR) - 1] = '\0';
+	sprintf_s(tempFile, sizeof(tempFile) / sizeof(CHAR) - 1, "ServerTemp%d.tmp", pThArg->number);
+	// Main Server Loop
+	while (!done && !shutFlag) { 	
+		done = ReceiveRequestMessage(&request, connectSock);
+
+		request.record[sizeof(request.record) - 1] = '\0';
+		commandLen = (int)(strcspn((CHAR*)request.record, "\n\t"));
+		memcpy(sysCommand, request.record, commandLen);
+		sysCommand[commandLen] = '\0';
+		printf("Command received on server slot %d: %s\n", pThArg->number, sysCommand);
+
+		/* Restest shutFlag, as it can be set from the console control handler. */
+		done = done || (strcmp((CHAR*)request.record, "$Quit") == 0) || shutFlag;
+		if (done) continue;
+
+		/* Open the temporary results file. */
+		hTmpFile = CreateFileA(tempFile, GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, &tempSA,
+			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (hTmpFile == INVALID_HANDLE_VALUE) {
+			printf("Cannot create temp file\n"); return 0;
+		}
+
+		//using DLL
+		dl_addr = NULL; 
+		if (pThArg->hDll != NULL) { 
+			char commandName[256] = "";
+			int commandNameLength = (int)(strcspn(sysCommand, " "));
+			strncpy_s(commandName, sizeof(commandName), sysCommand, min(commandNameLength, sizeof(commandName) - 1));
+			dl_addr = (int(*)(char *, char *))GetProcAddress(pThArg->hDll, commandName);
+			if (dl_addr != NULL) __try {
+				(*dl_addr)((char*)request.record, tempFile);
+			}
+			__except (EXCEPTION_EXECUTE_HANDLER) { /* Exception in the DLL */
+				printf("Unhandled Exception in DLL. Terminate server. There may be orphaned processes.\n");
+				return 1;
+			}
+		}
+		//using process
+		if (dl_addr == NULL) {
+			startInfoCh.hStdOutput = hTmpFile;
+			startInfoCh.hStdError = hTmpFile;
+			startInfoCh.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+			startInfoCh.dwFlags = STARTF_USESTDHANDLES;
+			if (!CreateProcessA(NULL, (char*)request.record, NULL,
+				NULL, TRUE, /* Inherit handles. */
+				0, NULL, NULL, &startInfoCh, &procInfo)) {
+				char error[] = "ERR: Cannot create process.\n";
+				DWORD writted = -1;
+				WriteFile(hTmpFile, error, sizeof(error), &writted, NULL);
+				procInfo.hProcess = NULL;
+			}
+			CloseHandle(hTmpFile);
+			if (procInfo.hProcess != NULL) {
+				CloseHandle(procInfo.hThread);
+				WaitForSingleObject(procInfo.hProcess, INFINITE);
+				CloseHandle(procInfo.hProcess);
+			}
+		}
+
+
+		//send to client
+		if (fopen_s(&fp, tempFile, "r") == 0) {
+			{
+				response.rsLen = MAX_RQRS_LEN;
+				while ((fgets((char*)response.record, MAX_RQRS_LEN, fp) != NULL))
+					SendResponseMessage(&response, connectSock);
+			}
+			/* Send a zero length message. Messages are 8-bit characters, not UNICODE. */
+			response.record[0] = '\0';
+			SendResponseMessage(&response, connectSock);
+			fclose(fp); fp = NULL;
+			DeleteFileA(tempFile);
+		}
+		else {
+			printf("Failed to open temp file with command results\n"); return 0;
+		}
+
+	}   // main loop End
+
+		//clear up
+	printf("Shuting down server thread number %d\n", pThArg->number);
+	/* Redundant shutdown. There are no further attempts to send or receive */
+	shutdown(connectSock, SD_BOTH);
+	closesocket(connectSock);
+
+	EnterCriticalSection(&(pThArg->threadCs));
+	__try {
+		threadState = pThArg->thState = SERVER_THREAD_STOPPED;
+	}
+	__finally { LeaveCriticalSection(&(pThArg->threadCs)); }
+
+	return threadState;
 }
 
 DWORD WINAPI AcceptThread(PVOID pArg)
