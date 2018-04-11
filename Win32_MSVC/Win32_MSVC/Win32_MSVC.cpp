@@ -3,7 +3,8 @@
 #include "Everything.h"
 #include "ClientServer.h"	
 #pragma comment(lib, "Ws2_32.lib")
-
+#define LOCALHOST "127.0.0.1"
+#define myPost 48500
 struct sockaddr_in srvSAddr;	
 struct sockaddr_in connectSAddr;	
 WSADATA WSStartData;
@@ -31,6 +32,149 @@ enum SERVER_THREAD_STATE {
  static SOCKET SrvSock = INVALID_SOCKET, connectSock = INVALID_SOCKET;
 int main(int argc, LPCSTR argv[])
 {
+	DWORD iThread, tStatus;
+	SERVER_ARG sArgs[MAX_CLIENTS];
+	HANDLE hAcceptThread = NULL;
+	HINSTANCE hDll = NULL;
+
+
+	// SetConsole control handler 
+	if (!SetConsoleCtrlHandler(Handler, TRUE)) {
+		printf("Cannot create Ctrl handler\n"); return 0;
+	}
+
+	//	Initialize the WS library
+	if (WSAStartup(MAKEWORD(2, 0), &WSStartData) != 0)
+	{
+		printf("Cannot support sockets\n"); return 0;
+	}
+	//try to Open the shared command library DLL
+/*
+
+if (argc > 1) {
+hDll = LoadLibraryA(argv[1]);
+if (hDll == NULL) {
+printf("Cannot Load DLL\n"); return 0;
+}
+}
+*/
+
+	// Intialize thread args 
+	for (iThread = 0; iThread < MAX_CLIENTS; iThread++) {
+		InitializeCriticalSection(&sArgs[iThread].threadCs);
+		sArgs[iThread].number = iThread;
+		sArgs[iThread].thState = SERVER_SLOT_FREE;
+		sArgs[iThread].sock = 0;
+		sArgs[iThread].hDll = hDll;
+		sArgs[iThread].hSrvThread = NULL;
+	}
+	//	Follow the standard server socket/bind/listen/accept sequence 
+	SrvSock = socket(PF_INET, SOCK_STREAM, 0);
+	if (SrvSock == INVALID_SOCKET) {
+		printf("Failed server socket() call\n"); return 0;
+	}
+
+	//	Prepare the socket address structure
+
+	srvSAddr.sin_family = AF_INET;
+	srvSAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	srvSAddr.sin_port = htons(myPost);
+	if (bind(SrvSock, (struct sockaddr *)&srvSAddr, sizeof(srvSAddr)) == SOCKET_ERROR)
+	{
+		printf("Failed server bind() call\n"); return 0;
+	}
+	printf("bind succ\n"); 
+	if (listen(SrvSock, MAX_CLIENTS) != 0) {
+		printf("Server listen() error\n"); return 0;
+	}
+	printf("In listening listen\n"); 
+
+	//Main thread becomes listening/connecting/monitoring thread
+	while (!shutFlag) {
+		iThread = 0;
+		while (!shutFlag) {
+		//Continously poll the thread thState
+			EnterCriticalSection(&sArgs[iThread].threadCs);
+			__try {
+				if (sArgs[iThread].thState == SERVER_THREAD_STOPPED) {
+					// This thread stopped
+					// Wait for it to stop
+					tStatus = WaitForSingleObject(sArgs[iThread].hSrvThread, INFINITE);
+					if (tStatus != WAIT_OBJECT_0) {
+						printf("Server thread wait error\n"); return 0;
+					}
+					CloseHandle(sArgs[iThread].hSrvThread);
+					sArgs[iThread].hSrvThread = NULL;
+					sArgs[iThread].thState = SERVER_SLOT_FREE;
+				}
+				//Free slot identified or shut down. Use a free slot for the next connection */
+				if (sArgs[iThread].thState == SERVER_SLOT_FREE || shutFlag) break;
+			}
+			__finally { LeaveCriticalSection(&sArgs[iThread].threadCs); }
+
+			iThread = (iThread + 1) % MAX_CLIENTS;
+			if (iThread == 0) Sleep(50);
+		}
+		if (shutFlag) break;
+		// sArgs[iThread] == SERVER_SLOT_FREE 
+		hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, (_beginthreadex_proc_type)AcceptThread, &sArgs[iThread], 0, NULL);
+		if (hAcceptThread == NULL) {
+			printf("Error creating AcceptThreadread.\n"); return 0;
+		}
+		while (!shutFlag) {
+			tStatus = WaitForSingleObject(hAcceptThread, CS_TIMEOUT);
+			if (tStatus == WAIT_OBJECT_0) {
+			//Connection is complete 
+				if (!shutFlag) {
+					CloseHandle(hAcceptThread);
+					hAcceptThread = NULL;
+				}
+				break;
+			}
+		}
+	}  
+
+	printf("Server shutdown in process. Wait for all server threads\n");
+
+	while (TRUE) {
+		int nRunningThreads = 0;
+		for (iThread = 0; iThread < MAX_CLIENTS; iThread++) {
+			EnterCriticalSection(&sArgs[iThread].threadCs);
+			__try {
+				if (sArgs[iThread].thState == SERVER_THREAD_RUNNING || sArgs[iThread].thState == SERVER_THREAD_STOPPED) {
+					if (WaitForSingleObject(sArgs[iThread].hSrvThread, 10000) == WAIT_OBJECT_0) {
+						printf("Server thread on slot %d stopped.\n", iThread);
+						CloseHandle(sArgs[iThread].hSrvThread);
+						sArgs[iThread].hSrvThread = NULL;
+						sArgs[iThread].thState = SERVER_SLOT_INVALID;
+					}
+					else
+						if (WaitForSingleObject(sArgs[iThread].hSrvThread, 10000) == WAIT_TIMEOUT) {
+							printf("Server thread on slot %d still running.\n", iThread);
+							nRunningThreads++;
+						}
+						else {
+							printf("Error waiting on server thread in slot %d.\n", iThread);
+							printf("Thread wait failure\n"); return 0;
+						}
+
+				}
+			}
+			__finally { LeaveCriticalSection(&sArgs[iThread].threadCs); }
+		}
+		if (nRunningThreads == 0) break;
+	}
+
+	if (hDll != NULL) FreeLibrary(hDll);
+
+	//clearup
+	shutdown(SrvSock, SD_BOTH);
+	closesocket(SrvSock);
+	WSACleanup();
+	if (hAcceptThread != NULL && WaitForSingleObject(hAcceptThread, INFINITE) != WAIT_OBJECT_0) {
+		printf("Failed waiting for accept thread to terminate.\n"); return 0;
+	}
+		
 	return 0;
 };
 
