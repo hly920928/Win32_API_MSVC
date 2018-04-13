@@ -10,10 +10,43 @@ struct data_8 {
 };
 bool sendDate(char* buffer, int len, SOCKET sk);
 bool receiveDate(char* buffer, int len, SOCKET sk);
-
+struct sockaddr_in clientSAddr;
 int main(int argc, LPCSTR argv[])
 {
-	
+	SOCKET clientSock = INVALID_SOCKET;
+	data_8 d1;
+	WSADATA WSStartData;
+	int conVal = 0;
+	if (WSAStartup(MAKEWORD(2, 0), &WSStartData) != 0) {
+		printf("Cannot support sockets\n"); return 0;
+	}
+	clientSock = socket(AF_INET, SOCK_STREAM, 0);
+	if (clientSock == INVALID_SOCKET) {
+		printf("Failed client socket() call\n"); return 0;
+	}
+	memset(&clientSAddr, 0, sizeof(clientSAddr));
+	clientSAddr.sin_family = AF_INET;
+	clientSAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	if (argc >= 2) {
+		int port = atoi(argv[1]);
+		clientSAddr.sin_port = htons(port);
+	}
+	else {
+		clientSAddr.sin_port = htons(myPost);
+	}
+	conVal = connect(clientSock, (struct sockaddr *)&clientSAddr, sizeof(clientSAddr));
+	if (conVal == SOCKET_ERROR) {
+		printf("Failed client connect() call Port is %d\n", (int)ntohs(clientSAddr.sin_port)); return 0;
+	}
+	else {
+		printf("client connect() succ\n");
+	}
+	//clear up
+	shutdown(clientSock, SD_BOTH);
+	closesocket(clientSock);
+	WSACleanup();
+	close(clientSock);
+	printf("Leaving client\n");
 	return 0;
 };
 
