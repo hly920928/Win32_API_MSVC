@@ -11,6 +11,10 @@ struct data_8 {
 bool sendDate(char* buffer, int len, SOCKET sk);
 bool receiveDate(char* buffer, int len, SOCKET sk);
 struct sockaddr_in clientSAddr;
+struct sockaddr_in srvSAddr;
+struct sockaddr_in connectSAddr;
+WSADATA WSStartData;
+static SOCKET SrvSock = INVALID_SOCKET, connectSock = INVALID_SOCKET;
 int main(int argc, LPCSTR argv[])
 {
 	SOCKET clientSock = INVALID_SOCKET;
@@ -45,7 +49,6 @@ int main(int argc, LPCSTR argv[])
 	shutdown(clientSock, SD_BOTH);
 	closesocket(clientSock);
 	WSACleanup();
-	close(clientSock);
 	printf("Leaving client\n");
 	return 0;
 };
