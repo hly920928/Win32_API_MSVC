@@ -57,17 +57,21 @@ int main(int argc, LPCSTR argv[])
 	while (!shutFlag) {
 		Sleep(2000);
 		int t = (rand());
-		itoa(t, dt.str,8);
+		itoa(t, dt.str, 8);
 		printf("Waiting Send %s\n", dt.str);
 		if (sendDate(dt.str, 8, clientSock)) {
 			printf("Send succ\n", dt.str);
-		}else {
+		}
+		else {
+			printf("Send fail\n", dt.str);
 			break;
 		}
 		printf("Waiting receive\n", dt.str);
 		if (receiveDate(dt.str, 8, clientSock)) {
-			printf("receive succ %s\n", dt.str);
-		}else {
+			printf("Receive succ %s\n", dt.str);
+		}
+		else {
+			printf("Receive fail\n", dt.str);
 			break;
 		}
 	}
@@ -77,8 +81,7 @@ int main(int argc, LPCSTR argv[])
 	WSACleanup();
 	printf("Leaving client\n");
 	return 0;
-};
-
+	};
 BOOL WINAPI Handler(DWORD CtrlEvent)
 {
 	printf("In console control handler\n");
@@ -94,10 +97,10 @@ bool sendDate(char * buffer, int len, SOCKET sk)
 	while (nRemain> 0 && !disconnect) {
 		nTransfered = send(sk, pToCur, nRemain, 0);
 		if (nTransfered == SOCKET_ERROR) {
-			printf("client send() failed\n"); return false;
+			printf("send() failed\n"); return false;
 		} 
-		disconnect = (nTransfered == 0);
 		nRemain -= nTransfered; pToCur += nTransfered;
+		disconnect = (nTransfered == 0) || (nRemain == 0);
 	}
 	return disconnect;
 }
@@ -110,10 +113,11 @@ bool receiveDate(char * buffer, int len, SOCKET sk)
 	while (nRemain> 0 && !disconnect) {
 		nTransfered = recv(sk, pToCur, nRemain, 0);
 		if (nTransfered == SOCKET_ERROR) {
-			printf("client send() failed\n"); return false;
+			printf("receive() failed\n"); return false;
 		}
-		disconnect = (nTransfered == 0);
 		nRemain -= nTransfered; pToCur += nTransfered;
+		disconnect = (nTransfered == 0)||(nRemain==0);
+		
 	}
 	return disconnect;
 }
