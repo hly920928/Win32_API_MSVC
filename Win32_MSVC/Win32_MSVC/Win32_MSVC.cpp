@@ -2,18 +2,21 @@
 #include "stdafx.h"
 #include "Everything.h"
 #include "ClientServer.h"	
+#include  <ctime>
 #pragma comment(lib, "Ws2_32.lib")
 #define LOCALHOST "127.0.0.1"
 #define myPost 48500
 struct data_8 {
 	char str[8];
 };
+static BOOL  WINAPI Handler (DWORD);
 bool sendDate(char* buffer, int len, SOCKET sk);
 bool receiveDate(char* buffer, int len, SOCKET sk);
 struct sockaddr_in clientSAddr;
 struct sockaddr_in srvSAddr;
 struct sockaddr_in connectSAddr;
 WSADATA WSStartData;
+volatile static unsigned int shutFlag = 0;
 static SOCKET SrvSock = INVALID_SOCKET, connectSock = INVALID_SOCKET;
 int main(int argc, LPCSTR argv[])
 {
@@ -21,6 +24,9 @@ int main(int argc, LPCSTR argv[])
 	data_8 d1;
 	WSADATA WSStartData;
 	int conVal = 0;
+	if (!SetConsoleCtrlHandler(Handler, TRUE)) {
+		printf("Cannot create Ctrl handler\n"); return 0;
+	}
 	if (WSAStartup(MAKEWORD(2, 0), &WSStartData) != 0) {
 		printf("Cannot support sockets\n"); return 0;
 	}
@@ -45,6 +51,26 @@ int main(int argc, LPCSTR argv[])
 	else {
 		printf("client connect() succ\n");
 	}
+	srand(time(NULL));
+	//sending and Receive Loop
+	data_8 dt;
+	while (!shutFlag) {
+		Sleep(2000);
+		int t = (rand());
+		itoa(t, dt.str,8);
+		printf("Waiting Send %s\n", dt.str);
+		if (sendDate(dt.str, 8, clientSock)) {
+			printf("Send succ\n", dt.str);
+		}else {
+			break;
+		}
+		printf("Waiting receive\n", dt.str);
+		if (receiveDate(dt.str, 8, clientSock)) {
+			printf("receive succ %s\n", dt.str);
+		}else {
+			break;
+		}
+	}
 	//clear up
 	shutdown(clientSock, SD_BOTH);
 	closesocket(clientSock);
@@ -52,6 +78,13 @@ int main(int argc, LPCSTR argv[])
 	printf("Leaving client\n");
 	return 0;
 };
+
+BOOL WINAPI Handler(DWORD CtrlEvent)
+{
+	printf("In console control handler\n");
+	InterlockedIncrement(&shutFlag);
+	return TRUE;
+}
 
 bool sendDate(char * buffer, int len, SOCKET sk)
 {
